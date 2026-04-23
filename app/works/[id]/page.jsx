@@ -14,21 +14,10 @@ export default function WorkDetail() {
 
   useEffect(() => {
     const fetchWork = async () => {
-      const { data: work } = await supabase
-        .from('works')
-        .select('*')
-        .eq('id', id)
-        .single()
-
+      const { data: work } = await supabase.from('works').select('*').eq('id', id).single()
       if (!work) { router.push('/'); return }
       setWork(work)
-
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('*')
-        .eq('id', work.user_id)
-        .single()
-
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', work.user_id).single()
       setProfile(profile)
       setLoading(false)
     }
@@ -40,57 +29,33 @@ export default function WorkDetail() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <Link href="/" className="text-xl font-bold text-blue-600">Academic Works</Link>
-        <button onClick={() => router.push('/')} className="text-sm text-blue-600 hover:underline">
-          ← Orqaga
-        </button>
+        <Link href="/" className="text-xl font-bold text-blue-600">← Bosh sahifa</Link>
+        <button onClick={() => router.back()} className="text-sm text-blue-600 hover:underline">← Orqaga</button>
       </header>
-
       <div className="max-w-3xl mx-auto p-6 space-y-4">
-
-        {/* Maqola ma'lumoti */}
         <div className="bg-white rounded-xl shadow p-6">
-          <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">
-            {categories[work.category_id]}
-          </span>
+          <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">{categories[work.category_id]}</span>
           <h2 className="text-xl font-bold mt-3 mb-2">{work.title}</h2>
           {work.description && <p className="text-gray-600 mb-3">{work.description}</p>}
-          {work.authors && (
-            <p className="text-sm text-gray-500 mb-4">✍️ {work.authors}</p>
-          )}
-          <p className="text-xs text-gray-400 mb-4">
-            {new Date(work.created_at).toLocaleDateString('uz')}
-          </p>
-          <a
-            href={work.file_url}
-            target="_blank"
-            className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block"
-          >
-            ⬇ Yuklab olish
-          </a>
+          {work.authors && <p className="text-sm text-gray-500 mb-4">✍️ {work.authors}</p>}
+          <p className="text-xs text-gray-400 mb-4">{new Date(work.created_at).toLocaleDateString('uz')}</p>
+          <a href={work.file_url} target="_blank" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block">⬇ Yuklab olish</a>
         </div>
-
-        {/* Yuklagan talaba profili */}
         {profile && (
           <div className="bg-white rounded-xl shadow p-6">
-            <h3 className="font-semibold text-gray-700 mb-3">📋 Yuklagan talaba</h3>
+            <h3 className="font-semibold text-gray-700 mb-3">📋 Yuklagan foydalanuvchi</h3>
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg">
                 {profile.full_name ? profile.full_name[0] : '?'}
               </div>
               <div>
-                <p className="font-semibold">{profile.full_name || 'Noma\'lum'}</p>
+                <p className="font-semibold">{profile.full_name || "Noma'lum"}</p>
                 {profile.university && <p className="text-sm text-gray-500">{profile.university}</p>}
                 {profile.faculty && <p className="text-sm text-gray-500">{profile.faculty}</p>}
                 {profile.year && <p className="text-sm text-gray-400">{profile.year}-kurs</p>}
               </div>
             </div>
-            <Link
-              href={`/user/${work.user_id}`}
-              className="mt-4 inline-block text-sm text-blue-600 hover:underline"
-            >
-              Barcha ishlarini ko'rish →
-            </Link>
+            <Link href={`/user/${work.user_id}`} className="mt-4 inline-block text-sm text-blue-600 hover:underline">Barcha ishlarini ko'rish →</Link>
           </div>
         )}
       </div>
