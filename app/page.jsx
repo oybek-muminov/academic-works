@@ -2,8 +2,10 @@
 import { useState, useEffect } from 'react'
 import { supabase } from './lib/supabase'
 import Link from 'next/link'
+import { useRouter } from 'next/navigation'
 
 export default function Home() {
+  const router = useRouter()
   const [works, setWorks] = useState([])
   const [search, setSearch] = useState('')
   const [category, setCategory] = useState(0)
@@ -96,10 +98,18 @@ export default function Home() {
                         {new Date(work.created_at).toLocaleDateString('uz')}
                       </span>
                     </div>
-                    <h3 className="font-semibold text-gray-800">{work.title}</h3>
+                    <h3 
+                      onClick={() => router.push(`/works/${work.id}`)}
+                      className="font-semibold text-gray-800 cursor-pointer hover:text-blue-600"
+                    >
+                      {work.title}
+                    </h3>
                     {work.description && (
                       <p className="text-sm text-gray-500 mt-1">{work.description}</p>
                     )}
+                    {work.authors && (
+                      <p className="text-xs text-gray-500 mt-1">✍️ {work.authors}</p>
+                      )}
                     {work.profiles?.full_name && (
                       <p className="text-xs text-gray-400 mt-1">
                         👤 {work.profiles.full_name}

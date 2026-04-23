@@ -14,6 +14,7 @@ export default function Dashboard() {
   const [categoryId, setCategoryId] = useState(1)
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
+  const [authors, setAuthors] = useState('')
 
   useEffect(() => {
     const getUser = async () => {
@@ -56,6 +57,7 @@ export default function Dashboard() {
       user_id: user.id,
       title,
       description,
+      authors: authors,
       category_id: categoryId,
       file_url: publicUrl,
       file_name: file.name,
@@ -85,10 +87,11 @@ export default function Dashboard() {
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-blue-600">Academic Works</h1>
+        <Link href="/" className="text-xl font-bold text-blue-600">← Bosh sahifa</Link>
         <div className="flex gap-3">
           <span className="text-sm text-gray-500">{user?.email}</span>
           <button onClick={handleLogout} className="text-sm text-red-500 hover:underline">Chiqish</button>
+          <button onClick={() => router.push('/profile')} className="text-sm text-blue-600 hover:underline">Profil</button>
         </div>
       </header>
 
@@ -119,6 +122,12 @@ export default function Dashboard() {
               value={description}
               onChange={e => setDescription(e.target.value)}
               className="w-full border rounded-lg p-3 mb-3 outline-none focus:border-blue-500 h-24 resize-none"
+            />
+            <input
+              placeholder="Mualliflar (masalan: A.Karimov, B.Rahimov)" 
+              value={authors} 
+              onChange={e => setAuthors(e.target.value)} 
+              className="w-full border rounded-lg p-3 mb-3 outline-none focus:border-blue-500"
             />
             <select
               value={categoryId}
