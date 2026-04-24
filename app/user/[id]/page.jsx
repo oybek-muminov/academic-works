@@ -10,6 +10,7 @@ export default function UserProfile() {
   const [profile, setProfile] = useState(null)
   const [works, setWorks] = useState([])
   const [category, setCategory] = useState(0)
+  const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const categories = ['Barchasi', 'Maqola', 'Tezis', 'Kitob', 'Sertifikat', 'Loyiha', 'Boshqa']
 
@@ -24,7 +25,13 @@ export default function UserProfile() {
     fetchData()
   }, [id])
 
-  const filtered = category === 0 ? works : works.filter(w => w.category_id === category)
+  const filtered = works.filter(w => {
+    const matchSearch = search === '' ||
+      (w.title && w.title.toLowerCase().includes(search.toLowerCase())) ||
+      (w.authors && w.authors.toLowerCase().includes(search.toLowerCase()))
+    const matchCat = category === 0 || w.category_id === category
+    return matchSearch && matchCat
+  })
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Yuklanmoqda...</div>
 
@@ -32,7 +39,7 @@ export default function UserProfile() {
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
         <Link href="/" className="text-xl font-bold text-blue-600">Academic Works</Link>
-        <button onClick={() => router.back()} className="text-sm text-blue-600 hover:underline">← Orqaga</button>
+        <button onClick={() => router.back()} className="text-sm text-blue-600 hover:underline">Orqaga</button>
       </header>
       <div className="max-w-5xl mx-auto p-6 flex gap-6 items-start">
         <div className="w-64 flex-shrink-0">
@@ -41,9 +48,8 @@ export default function UserProfile() {
               {profile?.full_name ? profile.full_name[0].toUpperCase() : '?'}
             </div>
             <h2 className="font-bold text-center text-lg mb-1">{profile?.full_name || "Noma'lum"}</h2>
-            {profile?.university && <p className="text-sm text-gray-500 text-center mb-1">🏛 {profile.university}</p>}
-            {profile?.faculty && <p className="text-sm text-gray-500 text-center mb-1">📚 {profile.faculty}</p>}
-            {profile?.year && <p className="text-sm text-gray-400 text-center mb-3">🎓 {profile.year}-kurs</p>}
+            {profile?.university && <p className="text-sm text-gray-500 text-left mb-1">🏛️ {profile.university}</p>}
+            {profile?.faculty && <p className="text-sm text-gray-500 text-left mb-1">📚 {profile.faculty}</p>}
             <div className="border-t pt-3 text-center">
               <p className="text-2xl font-bold text-blue-600">{works.length}</p>
               <p className="text-xs text-gray-400">ta ish yuklagan</p>
@@ -51,6 +57,13 @@ export default function UserProfile() {
           </div>
         </div>
         <div className="flex-1">
+          <input
+            type="text"
+            placeholder="Ishlar ichida qidirish..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:border-blue-500 bg-gray-50 mb-4"
+          />
           <div className="flex gap-2 mb-4 flex-wrap">
             {categories.map((cat, i) => (
               <button key={i} onClick={() => setCategory(i)}
@@ -76,11 +89,11 @@ export default function UserProfile() {
                       </div>
                       <h3 className="font-semibold text-gray-800">{work.title}</h3>
                       {work.description && <p className="text-sm text-gray-500 mt-1">{work.description}</p>}
-                      {work.authors && <p className="text-xs text-gray-400 mt-1">✍️ {work.authors}</p>}
+                      {work.authors && <p className="text-xs text-gray-400 mt-1">✍️ {work.authors}</p>}
                     </div>
                     <a href={work.file_url} target="_blank" onClick={e => e.stopPropagation()}
                       className="ml-4 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">
-                      ⬇ Yuklab olish
+                      Yuklab olish
                     </a>
                   </div>
                 </div>

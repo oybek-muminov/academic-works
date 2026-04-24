@@ -16,6 +16,7 @@ export default function Dashboard() {
   const [file, setFile] = useState(null)
   const [uploading, setUploading] = useState(false)
   const [authors, setAuthors] = useState('')
+  const [search, setSearch] = useState('')
 
   useEffect(() => {
     const getUser = async () => {
@@ -32,6 +33,12 @@ export default function Dashboard() {
     setWorks(data || [])
     setLoading(false)
   }
+
+  const filtered = works.filter(w =>
+    search === '' ||
+    (w.title && w.title.toLowerCase().includes(search.toLowerCase())) ||
+    (w.authors && w.authors.toLowerCase().includes(search.toLowerCase()))
+  )
 
   const handleUpload = async () => {
     if (!title || !file) return alert('Sarlavha va fayl kerak!')
@@ -68,8 +75,8 @@ export default function Dashboard() {
         <Link href="/" className="text-xl font-bold text-blue-600">Academic Works</Link>
         <div className="flex gap-3 items-center">
           <span className="text-sm text-gray-500">{user?.email}</span>
-          <button onClick={() => router.push('/profile')} className="text-sm text-blue-600 hover:underline">Profil</button>
-          <button onClick={handleLogout} className="text-sm text-red-500 hover:underline">Chiqish</button>
+          <button onClick={() => router.push('/profile')} className="text-sm bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition">👤 Profil</button>
+          <button onClick={handleLogout} className="text-sm bg-red-50 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-100 transition">Chiqish</button>
         </div>
       </header>
       <div className="max-w-4xl mx-auto p-6">
@@ -77,6 +84,13 @@ export default function Dashboard() {
           <h2 className="text-lg font-semibold">Mening ishlarim ({works.length})</h2>
           <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">+ Yangi ish</button>
         </div>
+        <input
+          type="text"
+          placeholder="Ishlar ichida qidirish..."
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:border-blue-500 bg-gray-50 mb-4"
+        />
         {showForm && (
           <div className="bg-white rounded-xl shadow p-6 mb-6">
             <h3 className="font-semibold mb-4">Yangi ish yuklash</h3>
@@ -100,13 +114,13 @@ export default function Dashboard() {
           </div>
         ) : (
           <div className="space-y-3">
-            {works.map(work => (
+            {filtered.map(work => (
               <div key={work.id} className="bg-white rounded-xl shadow p-5 flex justify-between items-center">
                 <div>
                   <h3 className="font-semibold">{work.title}</h3>
                   <p className="text-sm text-gray-500">{categories[work.category_id]} • {new Date(work.created_at).toLocaleDateString('uz')}</p>
                   {work.description && <p className="text-sm text-gray-600 mt-1">{work.description}</p>}
-                  {work.authors && <p className="text-xs text-gray-400 mt-1">✍️ {work.authors}</p>}
+                  {work.authors && <p className="text-xs text-gray-400 mt-1">✍️ {work.authors}</p>}
                 </div>
                 <div className="flex gap-2">
                   <a href={work.file_url} target="_blank" className="text-blue-600 text-sm hover:underline">Ko'rish</a>

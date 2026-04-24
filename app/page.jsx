@@ -22,7 +22,14 @@ export default function Home() {
       .select('*')
       .eq('is_public', true)
       .order('created_at', { ascending: false })
-    setWorks(data || [])
+    const seen = new Set()
+    const unique = (data || []).filter(work => {
+      const key = (work.title || '').toLowerCase().trim() + '|||' + (work.authors || '').toLowerCase().trim()
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+    setWorks(unique)
     setLoading(false)
   }
 
@@ -47,34 +54,33 @@ export default function Home() {
 
   const filtered = works.filter(w => {
     const matchSearch = search === '' ||
-      (w.authors && w.authors.toLowerCase().includes(search.toLowerCase())) ||
-      (w.title && w.title.toLowerCase().includes(search.toLowerCase()))
+      (w.title && w.title.toLowerCase().includes(search.toLowerCase())) ||
+      (w.authors && w.authors.toLowerCase().includes(search.toLowerCase()))
     const matchCat = category === 0 || w.category_id === category
     return matchSearch && matchCat
   })
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <header className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <h1 className="text-xl font-bold text-blue-600">Academic Works</h1>
-        {user ? (
-          <Link href="/dashboard" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Dashboard</Link>
-        ) : (
-          <Link href="/login" className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Kirish</Link>
-        )}
+      <header className="bg-blue-600 shadow-sm px-6 py-4">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-between items-center mb-3">
+            <h1 className="text-2xl font-bold text-white">Ilmiy ishlar bazasi</h1>
+            {user ? (
+              <Link href="/dashboard" className="border border-white text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Dashboard</Link>
+            ) : (
+              <Link href="/login" className="border border-white text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700">Kirish</Link>
+            )}
+          </div>
+          <input
+            type="text"
+            placeholder="Maqola nomi yoki muallif ismi bo'yicha qidirish..."
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            className="w-full px-4 py-2 border border-blue-400 rounded-xl outline-none focus:border-white bg-white bg-opacity-90 text-gray-700"
+          />
+        </div>
       </header>
-
-      <div className="bg-blue-600 text-white text-center py-12 px-4">
-        <h2 className="text-5xl font-bold mb-2">Ilmiy ishlar bazasi</h2>
-        <p className="text-blue-100 mb-6">Maqolalar, tezislar, kitoblar va sertifikatlar</p>
-        <input
-          type="text"
-          placeholder="Muallif ismi bo'yicha qidirish..."
-          value={search}
-          onChange={e => setSearch(e.target.value)}
-          className="w-full max-w-lg px-5 py-3 rounded-xl text-gray-800 outline-none shadow bg-white"
-        />
-      </div>
 
       <div className="max-w-4xl mx-auto p-6">
         <div className="flex gap-2 mb-6 flex-wrap">
@@ -90,7 +96,7 @@ export default function Home() {
           <div className="text-center text-gray-400 py-12">Yuklanmoqda...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center text-gray-400 py-12">
-            <p className="text-4xl mb-3">🔍</p>
+            <p className="text-4xl mb-3">💡</p>
             <p>Hech narsa topilmadi</p>
           </div>
         ) : (
@@ -105,7 +111,7 @@ export default function Home() {
                     </div>
                     <h3 className="font-semibold text-gray-800">{work.title}</h3>
                     {work.description && <p className="text-sm text-gray-500 mt-1">{work.description}</p>}
-                    {work.authors && <p className="text-xs text-gray-500 mt-1">✍️ {work.authors}</p>}
+                    {work.authors && <p className="text-xs text-gray-500 mt-1">✍️ {work.authors}</p>}
                   </div>
                   <div className="flex flex-col gap-2 items-end flex-shrink-0">
                     <a href={work.file_url} target="_blank"
@@ -136,7 +142,7 @@ export default function Home() {
                               <p className="text-xs text-gray-400">{uploaderProfiles[work.id].university}</p>
                             )}
                           </div>
-                          <span className="ml-auto text-blue-600 text-xs">{`Profilni ko'rish →`}</span>
+                          <span className="ml-auto text-blue-600 text-xs">Profilni ko'rish →</span>
                         </div>
                       ) : (
                         <p className="text-sm text-gray-400 text-center py-2">Yuklanmoqda...</p>
