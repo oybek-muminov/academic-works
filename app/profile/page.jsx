@@ -23,7 +23,7 @@ export default function ProfilePage() {
       setLoading(false)
     }
     getProfile()
-  }, [])
+  }, [router])
 
   const handleSave = async () => {
     setSaving(true)
@@ -44,7 +44,7 @@ export default function ProfilePage() {
         <h2 className="text-lg font-semibold mb-6">Profil sozlamalari</h2>
         <div className="bg-white rounded-xl shadow p-6 space-y-4">
           <div>
-            <label className="text-sm text-gray-600 mb-1 block">To'liq ism *</label>
+            <label className="text-sm text-gray-600 mb-1 block">To&apos;liq ism *</label>
             <input placeholder="Ism Familiya" value={fullName} onChange={e => setFullName(e.target.value)} className="w-full border rounded-lg p-3 outline-none focus:border-blue-500" />
           </div>
           <div>

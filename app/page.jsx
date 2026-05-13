@@ -16,23 +16,6 @@ export default function Home() {
 
   const categories = ['Barchasi', 'Maqola', 'Tezis', 'Kitob', 'Sertifikat', 'Loyiha', 'Boshqa']
 
-  async function fetchWorks() {
-    const { data } = await supabase
-      .from('works')
-      .select('*')
-      .eq('is_public', true)
-      .order('created_at', { ascending: false })
-    const seen = new Set()
-    const unique = (data || []).filter(work => {
-      const key = (work.title || '').toLowerCase().trim() + '|||' + (work.authors || '').toLowerCase().trim()
-      if (seen.has(key)) return false
-      seen.add(key)
-      return true
-    })
-    setWorks(unique)
-    setLoading(false)
-  }
-
   const fetchUploader = async (workId, userId) => {
     if (uploaderProfiles[workId]) {
       setExpandedId(expandedId === workId ? null : workId)
@@ -48,8 +31,45 @@ export default function Home() {
   }
 
   useEffect(() => {
-    supabase.auth.getUser().then(({ data: { user } }) => setUser(user))
-    fetchWorks()
+    let isActive = true
+
+    const loadPageData = async () => {
+      const [{ data: authData }, { data, error }] = await Promise.all([
+        supabase.auth.getUser(),
+        supabase
+          .from('works')
+          .select('*')
+          .eq('is_public', true)
+          .order('created_at', { ascending: false })
+      ])
+
+      if (!isActive) return
+
+      if (error) {
+        console.error('Works fetch failed:', error)
+        setWorks([])
+        setLoading(false)
+        return
+      }
+
+      const seen = new Set()
+      const unique = (data || []).filter(work => {
+        const key = (work.title || '').toLowerCase().trim() + '|||' + (work.authors || '').toLowerCase().trim()
+        if (seen.has(key)) return false
+        seen.add(key)
+        return true
+      })
+
+      setUser(authData.user)
+      setWorks(unique)
+      setLoading(false)
+    }
+
+    loadPageData()
+
+    return () => {
+      isActive = false
+    }
   }, [])
 
   const filtered = works.filter(w => {
@@ -114,7 +134,7 @@ export default function Home() {
                     {work.authors && <p className="text-xs text-gray-500 mt-1">✍️ {work.authors}</p>}
                   </div>
                   <div className="flex flex-col gap-2 items-end flex-shrink-0">
-                    <a href={work.file_url} target="_blank"
+                    <a href={work.file_url} target="_blank" rel="noopener noreferrer"
                       className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">
                       ⬇ Yuklab olish
                     </a>
@@ -142,7 +162,7 @@ export default function Home() {
                               <p className="text-xs text-gray-400">{uploaderProfiles[work.id].university}</p>
                             )}
                           </div>
-                          <span className="ml-auto text-blue-600 text-xs">Profilni ko'rish →</span>
+                          <span className="ml-auto text-blue-600 text-xs">Profilni ko&apos;rish →</span>
                         </div>
                       ) : (
                         <p className="text-sm text-gray-400 text-center py-2">Yuklanmoqda...</p>

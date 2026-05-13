@@ -22,7 +22,7 @@ export default function WorkDetail() {
       setLoading(false)
     }
     fetchWork()
-  }, [id])
+  }, [id, router])
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Yuklanmoqda...</div>
 
@@ -39,7 +39,7 @@ export default function WorkDetail() {
           {work.description && <p className="text-gray-600 mb-3">{work.description}</p>}
           {work.authors && <p className="text-sm text-gray-500 mb-4">✍️ {work.authors}</p>}
           <p className="text-xs text-gray-400 mb-4">{new Date(work.created_at).toLocaleDateString('uz')}</p>
-          <a href={work.file_url} target="_blank" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block">⬇ Yuklab olish</a>
+          <a href={work.file_url} target="_blank" rel="noopener noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block">⬇ Yuklab olish</a>
         </div>
         {profile && (
           <div className="bg-white rounded-xl shadow p-6">
@@ -55,7 +55,7 @@ export default function WorkDetail() {
                 {profile.year && <p className="text-sm text-gray-400">{profile.year}-kurs</p>}
               </div>
             </div>
-            <Link href={`/user/${work.user_id}`} className="mt-4 inline-block text-sm text-blue-600 hover:underline">Barcha ishlarini ko'rish →</Link>
+            <Link href={`/user/${work.user_id}`} className="mt-4 inline-block text-sm text-blue-600 hover:underline">Barcha ishlarini ko&apos;rish →</Link>
           </div>
         )}
       </div>

@@ -91,7 +91,7 @@ export default function UserProfile() {
                       {work.description && <p className="text-sm text-gray-500 mt-1">{work.description}</p>}
                       {work.authors && <p className="text-xs text-gray-400 mt-1">✍️ {work.authors}</p>}
                     </div>
-                    <a href={work.file_url} target="_blank" onClick={e => e.stopPropagation()}
+                    <a href={work.file_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
                       className="ml-4 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">
                       Yuklab olish
                     </a>
