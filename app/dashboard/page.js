@@ -116,6 +116,24 @@ export default function Dashboard() {
     fetchWorks(user.id)
   }
 
+  const handleVisibilityToggle = async (work) => {
+    const nextIsPublic = !work.is_public
+    const { error } = await supabase
+      .from('works')
+      .update({ is_public: nextIsPublic })
+      .eq('id', work.id)
+      .eq('user_id', user.id)
+
+    if (error) {
+      alert('Holat yangilanmadi!')
+      return
+    }
+
+    setWorks(prev => prev.map(item => (
+      item.id === work.id ? { ...item, is_public: nextIsPublic } : item
+    )))
+  }
+
   const handleLogout = async () => {
     await supabase.auth.signOut()
     router.push('/login')
@@ -131,7 +149,7 @@ export default function Dashboard() {
         <Link href="/" className="text-xl font-bold text-blue-600">Academic Works</Link>
         <div className="flex gap-3 items-center">
           <span className="text-sm text-gray-500">{user?.email}</span>
-          <button onClick={() => router.push('/profile')} className="text-sm bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition">👤 Profil</button>
+          <button onClick={() => router.push('/profile')} className="text-sm bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition">Profil</button>
           <button onClick={handleLogout} className="text-sm bg-red-50 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-100 transition">Chiqish</button>
         </div>
       </header>
@@ -159,7 +177,7 @@ export default function Dashboard() {
                 className="w-full border rounded-lg p-3 outline-none focus:border-blue-500 disabled:bg-gray-50"
               />
               {analyzing && (
-                <span className="absolute right-3 top-3 text-blue-500 text-sm animate-pulse">⏳ AI tahlil qilyapti...</span>
+                <span className="absolute right-3 top-3 text-blue-500 text-sm animate-pulse">AI tahlil qilyapti...</span>
               )}
             </div>
             <textarea placeholder="Tavsif (ixtiyoriy)" value={description} onChange={e => setDescription(e.target.value)} className="w-full border rounded-lg p-3 mb-3 outline-none focus:border-blue-500 h-24 resize-none" />
@@ -178,7 +196,7 @@ export default function Dashboard() {
             <div className="flex items-center justify-between border rounded-lg p-3 mb-3">
               <div>
                 <p className="text-sm font-medium text-gray-700">
-                  {isPublic ? '🌐 Ochiq' : '🔒 Shaxsiy'}
+                  {isPublic ? 'Ochiq' : 'Shaxsiy'}
                 </p>
                 <p className="text-xs text-gray-400">
                   {isPublic ? 'Hamma ko\'ra oladi' : 'Faqat siz ko\'rasiz'}
@@ -210,13 +228,11 @@ export default function Dashboard() {
             >
               {file ? (
                 <div className="text-green-600">
-                  <p className="text-2xl mb-1">✅</p>
                   <p className="font-medium">{file.name}</p>
                   <p className="text-xs text-gray-400 mt-1">Boshqa fayl tanlash uchun bosing</p>
                 </div>
               ) : (
                 <div className="text-gray-400">
-                  <p className="text-3xl mb-2">📁</p>
                   <p className="font-medium">Faylni shu yerga tashlang</p>
                   <p className="text-sm mt-1">yoki bosib tanlang</p>
                   <p className="text-xs mt-2">PDF, DOC, DOCX, JPG, PNG</p>
@@ -238,7 +254,6 @@ export default function Dashboard() {
         )}
         {works.length === 0 ? (
           <div className="bg-white rounded-xl shadow p-12 text-center text-gray-400">
-            <p className="text-4xl mb-3">📄</p>
             <p>Hali hech qanday ish yuklanmagan</p>
           </div>
         ) : (
@@ -247,11 +262,25 @@ export default function Dashboard() {
               <div key={work.id} className="bg-white rounded-xl shadow p-5 flex justify-between items-center">
                 <div>
                   <h3 className="font-semibold">{work.title}</h3>
-                  <p className="text-sm text-gray-500">{categories[work.category_id]} • {new Date(work.created_at).toLocaleDateString('uz')}</p>
+                  <p className="text-sm text-gray-500">{categories[work.category_id]} - {new Date(work.created_at).toLocaleDateString('uz')}</p>
                   {work.description && <p className="text-sm text-gray-600 mt-1">{work.description}</p>}
-                  {work.authors && <p className="text-xs text-gray-400 mt-1">✍️ {work.authors}</p>}
+                  {work.authors && <p className="text-xs text-gray-400 mt-1">Mualliflar: {work.authors}</p>}
                 </div>
-                <div className="flex gap-2">
+                <div className="flex gap-2 items-center">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-gray-500">{work.is_public ? 'Ochiq' : 'Shaxsiy'}</span>
+                    <button
+                      type="button"
+                      onClick={() => handleVisibilityToggle(work)}
+                      className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                        work.is_public ? 'bg-blue-600' : 'bg-gray-300'
+                      }`}
+                    >
+                      <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${
+                        work.is_public ? 'translate-x-6' : 'translate-x-1'
+                      }`} />
+                    </button>
+                  </div>
                   <a href={work.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm hover:underline">Ko&apos;rish</a>
                   <button onClick={() => handleDelete(work.id)} className="text-red-500 text-sm hover:underline">O&apos;chirish</button>
                 </div>

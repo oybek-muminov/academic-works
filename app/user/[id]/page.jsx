@@ -48,8 +48,8 @@ export default function UserProfile() {
               {profile?.full_name ? profile.full_name[0].toUpperCase() : '?'}
             </div>
             <h2 className="font-bold text-center text-lg mb-1">{profile?.full_name || "Noma'lum"}</h2>
-            {profile?.university && <p className="text-sm text-gray-500 text-left mb-1">🏛️ {profile.university}</p>}
-            {profile?.faculty && <p className="text-sm text-gray-500 text-left mb-1">📚 {profile.faculty}</p>}
+            {profile?.university && <p className="text-sm text-gray-500 text-left mb-1">Universitet: {profile.university}</p>}
+            {profile?.faculty && <p className="text-sm text-gray-500 text-left mb-1">Fakultet: {profile.faculty}</p>}
             <div className="border-t pt-3 text-center">
               <p className="text-2xl font-bold text-blue-600">{works.length}</p>
               <p className="text-xs text-gray-400">ta ish yuklagan</p>
@@ -74,7 +74,6 @@ export default function UserProfile() {
           </div>
           {filtered.length === 0 ? (
             <div className="bg-white rounded-xl shadow p-12 text-center text-gray-400">
-              <p className="text-4xl mb-3">📄</p>
               <p>Hech narsa topilmadi</p>
             </div>
           ) : (
@@ -89,7 +88,7 @@ export default function UserProfile() {
                       </div>
                       <h3 className="font-semibold text-gray-800">{work.title}</h3>
                       {work.description && <p className="text-sm text-gray-500 mt-1">{work.description}</p>}
-                      {work.authors && <p className="text-xs text-gray-400 mt-1">✍️ {work.authors}</p>}
+                      {work.authors && <p className="text-xs text-gray-400 mt-1">Mualliflar: {work.authors}</p>}
                     </div>
                     <a href={work.file_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
                       className="ml-4 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">

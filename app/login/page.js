@@ -30,7 +30,7 @@ export default function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="bg-white shadow-sm px-6 py-4">
-        <Link href="/" className="text-xl font-bold text-blue-600">← Bosh sahifa</Link>
+        <Link href="/" className="text-xl font-bold text-blue-600">Bosh sahifa</Link>
       </header>
       <div className="flex flex-1 items-center justify-center">
         <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">

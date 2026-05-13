@@ -116,7 +116,6 @@ export default function Home() {
           <div className="text-center text-gray-400 py-12">Yuklanmoqda...</div>
         ) : filtered.length === 0 ? (
           <div className="text-center text-gray-400 py-12">
-            <p className="text-4xl mb-3">💡</p>
             <p>Hech narsa topilmadi</p>
           </div>
         ) : (
@@ -131,17 +130,17 @@ export default function Home() {
                     </div>
                     <h3 className="font-semibold text-gray-800">{work.title}</h3>
                     {work.description && <p className="text-sm text-gray-500 mt-1">{work.description}</p>}
-                    {work.authors && <p className="text-xs text-gray-500 mt-1">✍️ {work.authors}</p>}
+                    {work.authors && <p className="text-xs text-gray-500 mt-1">Mualliflar: {work.authors}</p>}
                   </div>
                   <div className="flex flex-col gap-2 items-end flex-shrink-0">
                     <a href={work.file_url} target="_blank" rel="noopener noreferrer"
                       className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">
-                      ⬇ Yuklab olish
+                      Yuklab olish
                     </a>
                     <button
                       onClick={() => fetchUploader(work.id, work.user_id)}
                       className="bg-blue-100 text-blue-700 px-4 py-2 rounded-lg text-sm hover:bg-blue-200 whitespace-nowrap">
-                      👥 Yuklaganlar
+                      Yuklaganlar
                     </button>
                   </div>
                 </div>
@@ -162,7 +161,7 @@ export default function Home() {
                               <p className="text-xs text-gray-400">{uploaderProfiles[work.id].university}</p>
                             )}
                           </div>
-                          <span className="ml-auto text-blue-600 text-xs">Profilni ko&apos;rish →</span>
+                          <span className="ml-auto text-blue-600 text-xs">Profilni ko&apos;rish</span>
                         </div>
                       ) : (
                         <p className="text-sm text-gray-400 text-center py-2">Yuklanmoqda...</p>

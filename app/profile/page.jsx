@@ -56,7 +56,7 @@ export default function ProfilePage() {
             <input placeholder="Masalan: Kompyuter injiniringi" value={faculty} onChange={e => setFaculty(e.target.value)} className="w-full border rounded-lg p-3 outline-none focus:border-blue-500" />
           </div>
           <button onClick={handleSave} disabled={saving} className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50">
-            {saving ? 'Saqlanmoqda...' : success ? 'âœ… Saqlandi!' : 'Saqlash'}
+            {saving ? 'Saqlanmoqda...' : success ? 'Saqlandi!' : 'Saqlash'}
           </button>
         </div>
       </div>
