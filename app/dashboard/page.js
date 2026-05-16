@@ -19,6 +19,9 @@ export default function Dashboard() {
   const [search, setSearch] = useState('')
   const [analyzing, setAnalyzing] = useState(false)
   const [isPublic, setIsPublic] = useState(false)
+  const [profile, setProfile] = useState(null)
+  const [avatarFile, setAvatarFile] = useState(null)
+  const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   const fetchWorks = useCallback(async (userId) => {
     const { data } = await supabase.from('works').select('*').eq('user_id', userId).order('created_at', { ascending: false })
@@ -26,12 +29,30 @@ export default function Dashboard() {
     setLoading(false)
   }, [])
 
+  const fetchProfile = async (userId) => {
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+    setProfile(data)
+  }
+
+  const handleAvatarUpload = async (file) => {
+    if (!file || !user) return
+    setUploadingAvatar(true)
+    const fileExt = file.name.split('.').pop()
+    const fileName = `avatars/${user.id}.${fileExt}`
+    await supabase.storage.from('works-files').upload(fileName, file, { upsert: true })
+    const { data: { publicUrl } } = supabase.storage.from('works-files').getPublicUrl(fileName)
+    await supabase.from('profiles').upsert({ id: user.id, avatar_url: publicUrl })
+    setProfile(prev => ({ ...prev, avatar_url: publicUrl }))
+    setUploadingAvatar(false)
+  }
+
   useEffect(() => {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser()
       if (!user) { router.push('/login'); return }
       setUser(user)
       fetchWorks(user.id)
+      fetchProfile(user.id)
     }
     getUser()
   }, [fetchWorks, router])
@@ -148,12 +169,64 @@ export default function Dashboard() {
       <header className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
         <Link href="/" className="text-xl font-bold text-blue-600">Academic Works</Link>
         <div className="flex gap-3 items-center">
-          <span className="text-sm text-gray-500">{user?.email}</span>
-          <button onClick={() => router.push('/profile')} className="text-sm bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition">Profil</button>
           <button onClick={handleLogout} className="text-sm bg-red-50 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-100 transition">Chiqish</button>
         </div>
       </header>
-      <div className="max-w-4xl mx-auto p-6">
+      <div className="max-w-6xl mx-auto p-6 flex gap-6 items-start">
+        {/* LEFT COLUMN - Profile */}
+        <div className="w-64 flex-shrink-0">
+          <div className="bg-white rounded-xl shadow p-6 sticky top-6">
+            
+            {/* Avatar */}
+            <div className="relative mx-auto w-20 h-20 mb-3">
+              {profile?.avatar_url ? (
+                <img src={profile.avatar_url} alt="avatar" className="w-20 h-20 rounded-full object-cover mx-auto" />
+              ) : (
+                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-3xl mx-auto">
+                  {profile?.full_name ? profile.full_name[0].toUpperCase() : user?.email?.[0].toUpperCase()}
+                </div>
+              )}
+              <label className="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center cursor-pointer hover:bg-blue-700 text-sm">
+                📷
+                <input type="file" accept="image/*" className="hidden" onChange={e => { if(e.target.files[0]) handleAvatarUpload(e.target.files[0]) }} />
+              </label>
+              {uploadingAvatar && (
+                <div className="absolute inset-0 bg-white bg-opacity-70 rounded-full flex items-center justify-center text-xs text-blue-600">⏳</div>
+              )}
+            </div>
+
+            {/* Name */}
+            <h2 className="font-bold text-center text-base mb-1 text-gray-900">
+              {profile?.full_name || 'Ism kiritilmagan'}
+            </h2>
+
+            {/* Email */}
+            <p className="text-xs text-gray-400 text-center mb-3 break-all">{user?.email}</p>
+
+            {/* University & Faculty */}
+            {profile?.university && (
+              <p className="text-sm text-gray-600 text-center mb-1">🏛 {profile.university}</p>
+            )}
+            {profile?.faculty && (
+              <p className="text-sm text-gray-600 text-center mb-3">📚 {profile.faculty}</p>
+            )}
+
+            <div className="border-t pt-3 text-center mb-3">
+              <p className="text-2xl font-bold text-blue-600">{works.length}</p>
+              <p className="text-xs text-gray-400">ta ish yuklagan</p>
+            </div>
+
+            <button
+              onClick={() => router.push('/profile')}
+              className="w-full text-sm bg-blue-50 text-blue-600 border border-blue-200 py-2 rounded-lg hover:bg-blue-100 transition"
+            >
+              ✏️ Profilni tahrirlash
+            </button>
+          </div>
+        </div>
+        
+        {/* RIGHT COLUMN - Works */}
+        <div className="flex-1">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-semibold">Mening ishlarim ({works.length})</h2>
           <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">+ Yangi ish</button>
@@ -261,14 +334,14 @@ export default function Dashboard() {
             {filtered.map(work => (
               <div key={work.id} className="bg-white rounded-xl shadow p-5 flex justify-between items-center">
                 <div>
-                  <h3 className="font-semibold">{work.title}</h3>
-                  <p className="text-sm text-gray-500">{categories[work.category_id]} - {new Date(work.created_at).toLocaleDateString('uz')}</p>
-                  {work.description && <p className="text-sm text-gray-600 mt-1">{work.description}</p>}
-                  {work.authors && <p className="text-xs text-gray-400 mt-1">Mualliflar: {work.authors}</p>}
+                  <h3 className="font-semibold text-gray-900">{work.title}</h3>
+                  <p className="text-sm text-gray-600">{categories[work.category_id]} - {new Date(work.created_at).toLocaleDateString('uz')}</p>
+                  {work.description && <p className="text-sm text-gray-700 mt-1">{work.description}</p>}
+                  {work.authors && <p className="text-xs text-gray-600 mt-1">Mualliflar: {work.authors}</p>}
                 </div>
                 <div className="flex gap-2 items-center">
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-gray-500">{work.is_public ? 'Ochiq' : 'Shaxsiy'}</span>
+                    <span className="text-xs text-gray-600">{work.is_public ? 'Ochiq' : 'Shaxsiy'}</span>
                     <button
                       type="button"
                       onClick={() => handleVisibilityToggle(work)}
@@ -281,13 +354,16 @@ export default function Dashboard() {
                       }`} />
                     </button>
                   </div>
-                  <a href={work.file_url} target="_blank" rel="noopener noreferrer" className="text-blue-600 text-sm hover:underline">Ko&apos;rish</a>
-                  <button onClick={() => handleDelete(work.id)} className="text-red-500 text-sm hover:underline">O&apos;chirish</button>
+                  <div className="flex flex-col gap-2 items-end">
+                    <a href={work.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg text-sm hover:bg-blue-100 transition whitespace-nowrap">👁 Ko&apos;rish</a>
+                    <button onClick={() => handleDelete(work.id)} className="flex items-center gap-1 bg-red-50 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg text-sm hover:bg-red-100 transition whitespace-nowrap">🗑 O&apos;chirish</button>
+                  </div>
                 </div>
               </div>
             ))}
           </div>
         )}
+        </div>
       </div>
     </div>
   )
