@@ -58,8 +58,8 @@ export default function UserProfile() {
               )}
             </div>
             <h2 className="font-bold text-center text-lg mb-1">{profile?.full_name || "Noma'lum"}</h2>
-            {profile?.university && <p className="text-sm text-gray-500 text-left mb-1">Universitet: {profile.university}</p>}
-            {profile?.faculty && <p className="text-sm text-gray-500 text-left mb-1">Fakultet: {profile.faculty}</p>}
+            {profile?.university && <p className="text-sm text-gray-500 text-center mb-1">{profile.university}</p>}
+            {profile?.faculty && <p className="text-sm text-gray-500 text-center mb-1">{profile.faculty}</p>}
             <div className="border-t pt-3 text-center">
               <p className="text-2xl font-bold text-blue-600">{works.length}</p>
               <p className="text-xs text-gray-400">ta ish yuklagan</p>
