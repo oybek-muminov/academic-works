@@ -44,8 +44,18 @@ export default function UserProfile() {
       <div className="max-w-5xl mx-auto p-6 flex gap-6 items-start">
         <div className="w-64 flex-shrink-0">
           <div className="bg-white rounded-xl shadow p-6 sticky top-6">
-            <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-3xl mx-auto mb-4">
-              {profile?.full_name ? profile.full_name[0].toUpperCase() : '?'}
+            <div className="mx-auto mb-4 w-20 h-20">
+              {profile?.avatar_url ? (
+                <img
+                  src={profile.avatar_url}
+                  alt="avatar"
+                  className="w-20 h-20 rounded-full object-cover"
+                />
+              ) : (
+                <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-3xl">
+                  {profile?.full_name ? profile.full_name[0].toUpperCase() : '?'}
+                </div>
+              )}
             </div>
             <h2 className="font-bold text-center text-lg mb-1">{profile?.full_name || "Noma'lum"}</h2>
             {profile?.university && <p className="text-sm text-gray-500 text-left mb-1">Universitet: {profile.university}</p>}

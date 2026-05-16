@@ -45,8 +45,18 @@ export default function WorkDetail() {
           <div className="bg-white rounded-xl shadow p-6">
             <h3 className="font-semibold text-gray-700 mb-3">Yuklagan foydalanuvchi</h3>
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg">
-                {profile.full_name ? profile.full_name[0] : '?'}
+              <div className="w-12 h-12 flex-shrink-0">
+                {profile.avatar_url ? (
+                  <img
+                    src={profile.avatar_url}
+                    alt="avatar"
+                    className="w-12 h-12 rounded-full object-cover"
+                  />
+                ) : (
+                  <div className="w-12 h-12 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-lg">
+                    {profile.full_name ? profile.full_name[0] : '?'}
+                  </div>
+                )}
               </div>
               <div>
                 <p className="font-semibold">{profile.full_name || "Noma'lum"}</p>

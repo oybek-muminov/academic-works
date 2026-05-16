@@ -23,7 +23,7 @@ export default function Home() {
     }
     const { data } = await supabase
       .from('profiles')
-      .select('full_name, university')
+      .select('full_name, university, avatar_url')
       .eq('id', userId)
       .single()
     setUploaderProfiles(prev => ({ ...prev, [workId]: data }))
@@ -152,8 +152,18 @@ export default function Home() {
                           onClick={() => router.push(`/user/${work.user_id}`)}
                           className="bg-white rounded-lg px-4 py-2 text-sm cursor-pointer hover:bg-blue-100 transition flex items-center gap-3"
                         >
-                          <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm flex-shrink-0">
-                            {uploaderProfiles[work.id].full_name ? uploaderProfiles[work.id].full_name[0].toUpperCase() : '?'}
+                          <div className="w-8 h-8 flex-shrink-0">
+                            {uploaderProfiles[work.id]?.avatar_url ? (
+                              <img
+                                src={uploaderProfiles[work.id].avatar_url}
+                                alt="avatar"
+                                className="w-8 h-8 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 bg-blue-200 rounded-full flex items-center justify-center text-blue-700 font-bold text-sm">
+                                {uploaderProfiles[work.id]?.full_name ? uploaderProfiles[work.id].full_name[0].toUpperCase() : '?'}
+                              </div>
+                            )}
                           </div>
                           <div>
                             <p className="font-medium text-gray-800">{uploaderProfiles[work.id].full_name || "Noma'lum"}</p>
