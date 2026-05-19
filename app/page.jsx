@@ -16,6 +16,7 @@ export default function Home() {
   const [uploaderProfiles, setUploaderProfiles] = useState({})
 
   const categories = ['Barchasi', 'Maqola', 'Tezis', 'Kitob', 'Sertifikat', 'Loyiha', 'Boshqa']
+  const visibleCategory = (categoryId) => categoryId === 6 ? '' : categories[categoryId]
 
   const fetchUploader = async (workId, userId) => {
     if (uploaderProfiles[workId]) {
@@ -125,13 +126,13 @@ export default function Home() {
               <div key={work.id} className="bg-white rounded-xl shadow p-5">
                 <div className="flex justify-between items-start">
                   <div className="flex-1 pr-4">
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">{categories[work.category_id]}</span>
-                      <span className="text-xs text-gray-400">{new Date(work.created_at).toLocaleDateString('uz')}</span>
-                    </div>
+                    {visibleCategory(work.category_id) && (
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">{visibleCategory(work.category_id)}</span>
+                      </div>
+                    )}
                     <h3 className="font-semibold text-gray-800">{work.title}</h3>
-                    {work.description && <p className="text-sm text-gray-500 mt-1">{work.description}</p>}
-                    {work.authors && <p className="text-xs text-gray-500 mt-1">Mualliflar: {work.authors}</p>}
+                    {work.authors && <p className="text-xs text-gray-500 mt-1">{work.authors}</p>}
                   </div>
                   <div className="flex flex-col gap-2 items-end flex-shrink-0">
                     <a href={work.file_url} target="_blank" rel="noopener noreferrer"
@@ -186,7 +187,6 @@ export default function Home() {
             ))}
           </div>
         )}
-        <p className="text-center text-sm text-gray-400 mt-8">Jami {filtered.length} ta ish topildi</p>
       </div>
     </div>
   )

@@ -14,6 +14,7 @@ export default function UserProfile() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const categories = ['Barchasi', 'Maqola', 'Tezis', 'Kitob', 'Sertifikat', 'Loyiha', 'Boshqa']
+  const visibleCategory = (categoryId) => categoryId === 6 ? '' : categories[categoryId]
 
   useEffect(() => {
     const fetchData = async () => {
@@ -61,12 +62,8 @@ export default function UserProfile() {
               )}
             </div>
             <h2 className="font-bold text-center text-lg mb-1">{profile?.full_name || "Noma'lum"}</h2>
-            {profile?.university && <p className="text-sm text-gray-500 text-center mb-1">{profile.university}</p>}
-            {profile?.faculty && <p className="text-sm text-gray-500 text-center mb-1">{profile.faculty}</p>}
-            <div className="border-t pt-3 text-center">
-              <p className="text-2xl font-bold text-blue-600">{works.length}</p>
-              <p className="text-xs text-gray-400">ta ish yuklagan</p>
-            </div>
+            {profile?.university && <p className="text-sm text-gray-500 text-center mb-1">🏛️ {profile.university}</p>}
+            {profile?.faculty && <p className="text-sm text-gray-500 text-center mb-1">🎓 {profile.faculty}</p>}
           </div>
         </div>
         <div className="flex-1">
@@ -95,13 +92,13 @@ export default function UserProfile() {
                 <div key={work.id} onClick={() => router.push(`/works/${work.id}`)} className="bg-white rounded-xl shadow p-5 cursor-pointer hover:shadow-md transition">
                   <div className="flex justify-between items-start">
                     <div className="flex-1">
-                      <div className="flex items-center gap-2 mb-1">
-                        <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">{categories[work.category_id]}</span>
-                        <span className="text-xs text-gray-400">{new Date(work.created_at).toLocaleDateString('uz')}</span>
-                      </div>
+                      {visibleCategory(work.category_id) && (
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full">{visibleCategory(work.category_id)}</span>
+                        </div>
+                      )}
                       <h3 className="font-semibold text-gray-800">{work.title}</h3>
-                      {work.description && <p className="text-sm text-gray-500 mt-1">{work.description}</p>}
-                      {work.authors && <p className="text-xs text-gray-400 mt-1">Mualliflar: {work.authors}</p>}
+                      {work.authors && <p className="text-xs text-gray-400 mt-1">{work.authors}</p>}
                     </div>
                     <a href={work.file_url} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
                       className="ml-4 bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">
@@ -112,7 +109,6 @@ export default function UserProfile() {
               ))}
             </div>
           )}
-          <p className="text-center text-sm text-gray-400 mt-6">Jami {filtered.length} ta ish</p>
         </div>
       </div>
     </div>

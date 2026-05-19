@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { getCurrentUser, supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -21,6 +21,7 @@ export default function Dashboard() {
   const [isPublic, setIsPublic] = useState(false)
   const [profile, setProfile] = useState(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const fileInputRef = useRef(null)
 
   const fetchWorks = useCallback(async (userId) => {
     const { data } = await supabase.from('works').select('*').eq('user_id', userId).order('created_at', { ascending: false })
@@ -76,6 +77,21 @@ export default function Dashboard() {
     setFile(selectedFile)
   }
 
+  const resetUploadForm = () => {
+    setTitle('')
+    setDescription('')
+    setAuthors('')
+    setCategoryId(1)
+    setFile(null)
+    setIsPublic(false)
+    if (fileInputRef.current) fileInputRef.current.value = ''
+  }
+
+  const handleCancelUpload = () => {
+    resetUploadForm()
+    setShowForm(false)
+  }
+
   const handleUpload = async () => {
     if (!title || !file) return alert('Sarlavha va fayl kerak!')
     setUploading(true)
@@ -90,7 +106,8 @@ export default function Dashboard() {
       setUploading(false)
       return
     }
-    setTitle(''); setDescription(''); setAuthors(''); setFile(null); setIsPublic(false); setShowForm(false)
+    resetUploadForm()
+    setShowForm(false)
     fetchWorks(user.id)
     setUploading(false)
   }
@@ -125,6 +142,7 @@ export default function Dashboard() {
   }
 
   const categories = ['', 'Maqola', 'Tezis', 'Kitob', 'Sertifikat', 'Loyiha', 'Boshqa']
+  const visibleCategory = (categoryId) => categoryId === 6 ? '' : categories[categoryId]
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Yuklanmoqda...</div>
 
@@ -175,11 +193,6 @@ export default function Dashboard() {
               <p className="text-sm text-gray-600 text-center mb-3">📚 {profile.faculty}</p>
             )}
 
-            <div className="border-t pt-3 text-center mb-3">
-              <p className="text-2xl font-bold text-blue-600">{works.length}</p>
-              <p className="text-xs text-gray-400">ta ish yuklagan</p>
-            </div>
-
             <button
               onClick={() => router.push('/profile')}
               className="w-full text-sm bg-blue-50 text-blue-600 border border-blue-200 py-2 rounded-lg hover:bg-blue-100 transition"
@@ -192,7 +205,7 @@ export default function Dashboard() {
         {/* RIGHT COLUMN - Works */}
         <div className="flex-1">
         <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-semibold">Mening ishlarim ({works.length})</h2>
+          <h2 className="text-lg font-semibold">Mening ishlarim</h2>
           <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">+ Yangi ish</button>
         </div>
         <input
@@ -205,6 +218,7 @@ export default function Dashboard() {
         {showForm && (
           <div className="bg-white rounded-xl shadow p-6 mb-6">
             <h3 className="font-semibold mb-4">Yangi ish yuklash</h3>
+            <p className="text-sm text-green-500 mb-3">Sarlavha va mualliflarni hujjatdan nusxa olib joylang. Bu saralash uchun zarur!</p>
             <div className="relative mb-3">
               <input
                 placeholder="Sarlavha *"
@@ -255,11 +269,24 @@ export default function Dashboard() {
                 const droppedFile = e.dataTransfer.files[0]
                 if (droppedFile) handleFileSelect(droppedFile)
               }}
-              onClick={() => document.getElementById('fileInput').click()}
+              onClick={() => fileInputRef.current?.click()}
               className="w-full border-2 border-dashed border-gray-300 rounded-xl p-8 mb-4 text-center cursor-pointer hover:border-blue-400 hover:bg-blue-50 transition"
             >
               {file ? (
-                <div className="text-green-600">
+                <div className="relative text-green-600 group">
+                  <button
+                    type="button"
+                    onClick={e => {
+                      e.stopPropagation()
+                      setFile(null)
+                      if (fileInputRef.current) fileInputRef.current.value = ''
+                    }}
+                    className="absolute -right-2 -top-4 flex h-7 w-7 items-center justify-center rounded-full border border-red-200 bg-white text-red-500 opacity-0 shadow-sm transition group-hover:opacity-100 hover:bg-red-50"
+                    aria-label="Faylni olib tashlash"
+                    title="Faylni olib tashlash"
+                  >
+                    x
+                  </button>
                   <p className="font-medium">{file.name}</p>
                   <p className="text-xs text-gray-400 mt-1">Boshqa fayl tanlash uchun bosing</p>
                 </div>
@@ -272,6 +299,7 @@ export default function Dashboard() {
               )}
             </div>
             <input
+              ref={fileInputRef}
               id="fileInput"
               type="file"
               accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
@@ -280,7 +308,7 @@ export default function Dashboard() {
             />
             <div className="flex gap-3">
               <button onClick={handleUpload} disabled={uploading} className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 disabled:opacity-50">{uploading ? 'Yuklanmoqda...' : 'Yuklash'}</button>
-              <button onClick={() => setShowForm(false)} className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300">Bekor</button>
+              <button onClick={handleCancelUpload} className="bg-gray-200 text-gray-700 px-6 py-2 rounded-lg hover:bg-gray-300">Bekor</button>
             </div>
           </div>
         )}
@@ -291,12 +319,12 @@ export default function Dashboard() {
         ) : (
           <div className="space-y-3">
             {filtered.map(work => (
-              <div key={work.id} className="bg-white rounded-xl shadow p-5 flex justify-between items-center">
+              <div key={work.id} className="bg-white rounded-xl shadow px-5 flex justify-between items-center py-3">
                 <div>
+                  {visibleCategory(work.category_id) && <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full mb-2 inline-block">{visibleCategory(work.category_id)}</span>}
                   <h3 className="font-semibold text-gray-900">{work.title}</h3>
-                  <p className="text-sm text-gray-600">{categories[work.category_id]} - {new Date(work.created_at).toLocaleDateString('uz')}</p>
-                  {work.description && <p className="text-sm text-gray-700 mt-1">{work.description}</p>}
-                  {work.authors && <p className="text-xs text-gray-600 mt-1">Mualliflar: {work.authors}</p>}
+                  {work.description && <p className="text-sm text-gray-700 border border-blue-200 mt-1 px-2 py-1"> {work.description}</p>}
+                  {work.authors && <p className="text-xs text-gray-600 mt-2">{work.authors}</p>}
                 </div>
                 <div className="flex gap-2 items-center">
                   <div className="flex items-center gap-2">
