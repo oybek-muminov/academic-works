@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect, useCallback } from 'react'
-import { supabase } from '../lib/supabase'
+import { getCurrentUser, supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function Dashboard() {
   const router = useRouter()
@@ -17,10 +18,8 @@ export default function Dashboard() {
   const [uploading, setUploading] = useState(false)
   const [authors, setAuthors] = useState('')
   const [search, setSearch] = useState('')
-  const [analyzing, setAnalyzing] = useState(false)
   const [isPublic, setIsPublic] = useState(false)
   const [profile, setProfile] = useState(null)
-  const [avatarFile, setAvatarFile] = useState(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
 
   const fetchWorks = useCallback(async (userId) => {
@@ -39,16 +38,26 @@ export default function Dashboard() {
     setUploadingAvatar(true)
     const fileExt = file.name.split('.').pop()
     const fileName = `avatars/${user.id}.${fileExt}`
-    await supabase.storage.from('works-files').upload(fileName, file, { upsert: true })
+    const { error: uploadError } = await supabase.storage.from('works-files').upload(fileName, file, { upsert: true })
+    if (uploadError) {
+      alert('Avatar yuklanmadi!')
+      setUploadingAvatar(false)
+      return
+    }
     const { data: { publicUrl } } = supabase.storage.from('works-files').getPublicUrl(fileName)
-    await supabase.from('profiles').upsert({ id: user.id, avatar_url: publicUrl })
+    const { error: profileError } = await supabase.from('profiles').upsert({ id: user.id, avatar_url: publicUrl })
+    if (profileError) {
+      alert('Avatar profilda saqlanmadi!')
+      setUploadingAvatar(false)
+      return
+    }
     setProfile(prev => ({ ...prev, avatar_url: publicUrl }))
     setUploadingAvatar(false)
   }
 
   useEffect(() => {
     const getUser = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
+      const user = await getCurrentUser()
       if (!user) { router.push('/login'); return }
       setUser(user)
       fetchWorks(user.id)
@@ -65,56 +74,6 @@ export default function Dashboard() {
 
   const handleFileSelect = async (selectedFile) => {
     setFile(selectedFile)
-    
-    if (!selectedFile.name.endsWith('.pdf')) return
-    if (title && authors) return
-    
-    setAnalyzing(true)
-    
-    try {
-      const base64 = await new Promise((resolve, reject) => {
-        const reader = new FileReader()
-        reader.onload = () => resolve(reader.result.split(',')[1])
-        reader.onerror = reject
-        reader.readAsDataURL(selectedFile)
-      })
-
-      const response = await fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          model: 'claude-sonnet-4-20250514',
-          max_tokens: 500,
-          messages: [{
-            role: 'user',
-            content: [
-              {
-                type: 'document',
-                source: { type: 'base64', media_type: 'application/pdf', data: base64 }
-              },
-              {
-                type: 'text',
-                text: 'Extract the title and authors from this academic paper. Reply ONLY with JSON in this exact format, nothing else: {"title": "paper title here", "authors": "Author1, Author2, Author3"}'
-              }
-            ]
-          }]
-        })
-      })
-
-      const data = await response.json()
-      const text = data.content?.[0]?.text || ''
-      
-      try {
-        const parsed = JSON.parse(text)
-        if (parsed.title && !title) setTitle(parsed.title)
-        if (parsed.authors && !authors) setAuthors(parsed.authors)
-      } catch {}
-      
-    } catch (err) {
-      console.error('Auto-detect failed:', err)
-    }
-    
-    setAnalyzing(false)
   }
 
   const handleUpload = async () => {
@@ -125,7 +84,12 @@ export default function Dashboard() {
     const { error: uploadError } = await supabase.storage.from('works-files').upload(fileName, file)
     if (uploadError) { alert('Fayl yuklanmadi!'); setUploading(false); return }
     const { data: { publicUrl } } = supabase.storage.from('works-files').getPublicUrl(fileName)
-    await supabase.from('works').insert({ user_id: user.id, title, description, authors, category_id: categoryId, is_public: isPublic, file_url: publicUrl, file_name: file.name })
+    const { error: insertError } = await supabase.from('works').insert({ user_id: user.id, title, description, authors, category_id: categoryId, is_public: isPublic, file_url: publicUrl, file_name: file.name })
+    if (insertError) {
+      alert('Ish bazaga saqlanmadi!')
+      setUploading(false)
+      return
+    }
     setTitle(''); setDescription(''); setAuthors(''); setFile(null); setIsPublic(false); setShowForm(false)
     fetchWorks(user.id)
     setUploading(false)
@@ -180,7 +144,7 @@ export default function Dashboard() {
             {/* Avatar */}
             <div className="relative mx-auto w-20 h-20 mb-3">
               {profile?.avatar_url ? (
-                <img src={profile.avatar_url} alt="avatar" className="w-20 h-20 rounded-full object-cover mx-auto" />
+                <Image src={profile.avatar_url} alt="avatar" width={80} height={80} className="w-20 h-20 rounded-full object-cover mx-auto" />
               ) : (
                 <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-3xl mx-auto">
                   {profile?.full_name ? profile.full_name[0].toUpperCase() : user?.email?.[0].toUpperCase()}
@@ -243,24 +207,19 @@ export default function Dashboard() {
             <h3 className="font-semibold mb-4">Yangi ish yuklash</h3>
             <div className="relative mb-3">
               <input
-                placeholder={analyzing ? "AI sarlavhani qidiryapti..." : "Sarlavha *"}
+                placeholder="Sarlavha *"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
-                disabled={analyzing}
-                className="w-full border rounded-lg p-3 outline-none focus:border-blue-500 disabled:bg-gray-50"
+                className="w-full border rounded-lg p-3 outline-none focus:border-blue-500"
               />
-              {analyzing && (
-                <span className="absolute right-3 top-3 text-blue-500 text-sm animate-pulse">AI tahlil qilyapti...</span>
-              )}
             </div>
             <textarea placeholder="Tavsif (ixtiyoriy)" value={description} onChange={e => setDescription(e.target.value)} className="w-full border rounded-lg p-3 mb-3 outline-none focus:border-blue-500 h-24 resize-none" />
             <div className="relative mb-3">
               <input
-                placeholder={analyzing ? "AI mualliflarni qidiryapti..." : "Mualliflar"}
+                placeholder="Mualliflar"
                 value={authors}
                 onChange={e => setAuthors(e.target.value)}
-                disabled={analyzing}
-                className="w-full border rounded-lg p-3 outline-none focus:border-blue-500 disabled:bg-gray-50"
+                className="w-full border rounded-lg p-3 outline-none focus:border-blue-500"
               />
             </div>
             <select value={categoryId} onChange={e => setCategoryId(Number(e.target.value))} className="w-full border rounded-lg p-3 mb-3 outline-none focus:border-blue-500">

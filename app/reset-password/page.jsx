@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
@@ -34,7 +34,7 @@ export default function ResetPassword() {
           <h2 className="text-xl font-bold mb-2">Parol yangilandi!</h2>
           <button onClick={() => router.push('/dashboard')}
             className="mt-4 bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700">
-            Dashboardga o'tish
+            Dashboardga o&apos;tish
           </button>
         </div>
       </div>
@@ -48,7 +48,7 @@ export default function ResetPassword() {
       </header>
       <div className="flex flex-1 items-center justify-center">
         <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
-          <h1 className="text-2xl font-bold text-center mb-6">Yangi parol o'rnatish</h1>
+          <h1 className="text-2xl font-bold text-center mb-6">Yangi parol o&apos;rnatish</h1>
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
           <input
             type="password"

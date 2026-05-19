@@ -9,27 +9,79 @@ export default function LoginPage() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [isRegister, setIsRegister] = useState(false)
+  const [isResetMode, setIsResetMode] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
+  const [message, setMessage] = useState('')
   const [showPassword, setShowPassword] = useState(false)
+
+  const clearMessages = () => {
+    setError('')
+    setMessage('')
+  }
+
+  const getEmailForLogin = async (value) => {
+    const loginValue = value.trim()
+
+    if (!loginValue) return null
+    if (loginValue.includes('@')) return loginValue
+
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('login_email')
+      .eq('username', loginValue.toLowerCase())
+      .single()
+
+    return profile?.login_email || null
+  }
+
+  const handlePasswordReset = async () => {
+    setLoading(true)
+    clearMessages()
+
+    const loginEmail = await getEmailForLogin(email)
+    if (!loginEmail) {
+      setError("Email yoki username topilmadi!")
+      setLoading(false)
+      return
+    }
+
+    const { error } = await supabase.auth.resetPasswordForEmail(loginEmail, {
+      redirectTo: `${window.location.origin}/reset-password`
+    })
+
+    if (error) setError(error.message)
+    else setMessage("Parolni tiklash havolasi emailingizga yuborildi. Spam papkasini ham tekshiring.")
+    setLoading(false)
+  }
 
   const handleSubmit = async () => {
     setLoading(true)
-    setError('')
+    clearMessages()
+
+    if (isResetMode) {
+      await handlePasswordReset()
+      return
+    }
 
     if (isRegister) {
       const { error } = await supabase.auth.signUp({ email, password })
-      if (error) setError(error.message)
-      else alert('Muvaffaqiyatli ro\'yxatdan o\'tdingiz!')
+      if (error) {
+        setError(error.message)
+        setLoading(false)
+        return
+      }
+
+      alert('Muvaffaqiyatli ro\'yxatdan o\'tdingiz!')
       router.push('/dashboard')
     } else {
-      let loginEmail = email
+      let loginEmail = email.trim()
 
-      if (!email.includes('@')) {
+      if (!loginEmail.includes('@')) {
         const { data: profile } = await supabase
           .from('profiles')
           .select('id')
-          .eq('username', email.toLowerCase().trim())
+          .eq('username', loginEmail.toLowerCase())
           .single()
 
         if (!profile) {
@@ -41,7 +93,7 @@ export default function LoginPage() {
         const { data: profileWithEmail } = await supabase
           .from('profiles')
           .select('login_email')
-          .eq('username', email.toLowerCase().trim())
+          .eq('username', loginEmail.toLowerCase())
           .single()
 
         if (!profileWithEmail?.login_email) {
@@ -59,6 +111,18 @@ export default function LoginPage() {
     setLoading(false)
   }
 
+  const switchAuthMode = () => {
+    setIsRegister(!isRegister)
+    setIsResetMode(false)
+    clearMessages()
+  }
+
+  const switchResetMode = (enabled) => {
+    setIsResetMode(enabled)
+    setIsRegister(false)
+    clearMessages()
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gray-50">
       <header className="bg-white shadow-sm px-6 py-4">
@@ -66,36 +130,67 @@ export default function LoginPage() {
       </header>
       <div className="flex flex-1 items-center justify-center">
         <div className="bg-white p-8 rounded-xl shadow-md w-full max-w-md">
-          <h1 className="text-2xl font-bold text-center mb-6">{isRegister ? "Ro'yxatdan o'tish" : "Kirish"}</h1>
+          <h1 className="text-2xl font-bold text-center mb-6">
+            {isResetMode ? 'Parolni tiklash' : isRegister ? "Ro'yxatdan o'tish" : 'Kirish'}
+          </h1>
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
-          <input type="email" placeholder="Email yoki username" value={email} onChange={e => setEmail(e.target.value)}
-            className="w-full border rounded-lg p-3 mb-3 outline-none focus:border-blue-500" />
-          <div className="relative mb-4">
-            <input
-              type={showPassword ? 'text' : 'password'}
-              placeholder="Parol"
-              value={password}
-              onChange={e => setPassword(e.target.value)}
-              className="w-full border rounded-lg p-3 outline-none focus:border-blue-500 pr-12"
-            />
+          {message && <p className="text-green-600 text-sm mb-4">{message}</p>}
+          <input
+            type="email"
+            placeholder="Email yoki username"
+            value={email}
+            onChange={e => setEmail(e.target.value)}
+            className="w-full border rounded-lg p-3 mb-3 outline-none focus:border-blue-500"
+          />
+          {!isResetMode && (
+            <div className="relative mb-4">
+              <input
+                type={showPassword ? 'text' : 'password'}
+                placeholder="Parol"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                className="w-full border rounded-lg p-3 outline-none focus:border-blue-500 pr-12"
+              />
+              <button
+                type="button"
+                onClick={() => setShowPassword(!showPassword)}
+                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 text-lg"
+              >
+                {showPassword ? '🙈' : '👁'}
+              </button>
+            </div>
+          )}
+          <button
+            onClick={handleSubmit}
+            disabled={loading}
+            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50"
+          >
+            {loading ? 'Yuklanmoqda...' : isResetMode ? 'Tiklash havolasini yuborish' : isRegister ? "Ro'yxatdan o'tish" : 'Kirish'}
+          </button>
+          {!isRegister && !isResetMode && (
             <button
               type="button"
-              onClick={() => setShowPassword(!showPassword)}
-              className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 text-lg"
+              onClick={() => switchResetMode(true)}
+              className="w-full text-center mt-3 text-sm text-blue-600 font-medium"
             >
-              {showPassword ? '🙈' : '👁'}
+              Parolni unutdingizmi?
             </button>
-          </div>
-          <button onClick={handleSubmit} disabled={loading}
-            className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50">
-            {loading ? 'Yuklanmoqda...' : isRegister ? "Ro'yxatdan o'tish" : 'Kirish'}
-          </button>
-          <p className="text-center mt-4 text-sm text-gray-600">
-            {isRegister ? 'Hisobingiz bormi? ' : "Hisobingiz yo'qmi? "}
-            <button onClick={() => setIsRegister(!isRegister)} className="text-blue-600 font-medium">
-              {isRegister ? 'Kirish' : "Ro'yxatdan o'tish"}
-            </button>
-          </p>
+          )}
+          {isResetMode ? (
+            <p className="text-center mt-4 text-sm text-gray-600">
+              Parol esingizdami?{' '}
+              <button onClick={() => switchResetMode(false)} className="text-blue-600 font-medium">
+                Kirish
+              </button>
+            </p>
+          ) : (
+            <p className="text-center mt-4 text-sm text-gray-600">
+              {isRegister ? 'Hisobingiz bormi? ' : "Hisobingiz yo'qmi? "}
+              <button onClick={switchAuthMode} className="text-blue-600 font-medium">
+                {isRegister ? 'Kirish' : "Ro'yxatdan o'tish"}
+              </button>
+            </p>
+          )}
         </div>
       </div>
     </div>

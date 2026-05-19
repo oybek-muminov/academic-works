@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { supabase } from '../../lib/supabase'
+import { getCurrentUser, supabase } from '../../lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function WorkDetail() {
   const { id } = useParams()
@@ -14,8 +15,19 @@ export default function WorkDetail() {
 
   useEffect(() => {
     const fetchWork = async () => {
-      const { data: work } = await supabase.from('works').select('*').eq('id', id).single()
+      const [{ data: work }, currentUser] = await Promise.all([
+        supabase.from('works').select('*').eq('id', id).single(),
+        getCurrentUser()
+      ])
+
       if (!work) { router.push('/'); return }
+
+      const isOwner = currentUser?.id === work.user_id
+      if (!work.is_public && !isOwner) {
+        router.push('/')
+        return
+      }
+
       setWork(work)
       const { data: profile } = await supabase.from('profiles').select('*').eq('id', work.user_id).single()
       setProfile(profile)
@@ -47,9 +59,11 @@ export default function WorkDetail() {
             <div className="flex items-center gap-4">
               <div className="w-12 h-12 flex-shrink-0">
                 {profile.avatar_url ? (
-                  <img
+                  <Image
                     src={profile.avatar_url}
                     alt="avatar"
+                    width={48}
+                    height={48}
                     className="w-12 h-12 rounded-full object-cover"
                   />
                 ) : (

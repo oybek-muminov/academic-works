@@ -1,8 +1,9 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { supabase } from './lib/supabase'
+import { getCurrentUser, supabase } from './lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 
 export default function Home() {
   const router = useRouter()
@@ -34,8 +35,8 @@ export default function Home() {
     let isActive = true
 
     const loadPageData = async () => {
-      const [{ data: authData }, { data, error }] = await Promise.all([
-        supabase.auth.getUser(),
+      const [currentUser, { data, error }] = await Promise.all([
+        getCurrentUser(),
         supabase
           .from('works')
           .select('*')
@@ -60,7 +61,7 @@ export default function Home() {
         return true
       })
 
-      setUser(authData.user)
+      setUser(currentUser)
       setWorks(unique)
       setLoading(false)
     }
@@ -154,9 +155,11 @@ export default function Home() {
                         >
                           <div className="w-8 h-8 flex-shrink-0">
                             {uploaderProfiles[work.id]?.avatar_url ? (
-                              <img
+                              <Image
                                 src={uploaderProfiles[work.id].avatar_url}
                                 alt="avatar"
+                                width={32}
+                                height={32}
                                 className="w-8 h-8 rounded-full object-cover"
                               />
                             ) : (

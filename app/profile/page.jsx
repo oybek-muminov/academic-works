@@ -1,6 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { getCurrentUser, supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 
 export default function ProfilePage() {
@@ -13,16 +13,14 @@ export default function ProfilePage() {
   const [saving, setSaving] = useState(false)
   const [success, setSuccess] = useState(false)
   const [username, setUsername] = useState('')
-  const [currentPassword, setCurrentPassword] = useState('')
   const [newPassword, setNewPassword] = useState('')
-  const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [passwordSuccess, setPasswordSuccess] = useState(false)
   const [passwordError, setPasswordError] = useState('')
 
   useEffect(() => {
     const getProfile = async () => {
-      const { data: { user } } = await supabase.auth.getUser()
+      const user = await getCurrentUser()
       if (!user) { router.push('/login'); return }
       setUser(user)
       const { data } = await supabase.from('profiles').select('*').eq('id', user.id).single()
@@ -47,7 +45,6 @@ export default function ProfilePage() {
     if (error) setPasswordError(error.message)
     else {
       setPasswordSuccess(true)
-      setCurrentPassword('')
       setNewPassword('')
       setTimeout(() => setPasswordSuccess(false), 3000)
     }
@@ -58,7 +55,7 @@ export default function ProfilePage() {
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
-        <button onClick={() => router.push('/dashboard')} className="text-sm text-blue-600 hover:underline">Dashboard</button>
+        <button onClick={() => router.push('/dashboard')} className="text-sm bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg hover:bg-blue-100 transition">Dashboard</button>
       </header>
       <div className="max-w-lg mx-auto p-6">
         <h2 className="text-lg font-semibold mb-6">Profil sozlamalari</h2>
@@ -83,7 +80,7 @@ export default function ProfilePage() {
               onChange={e => setUsername(e.target.value)}
               className="w-full border rounded-lg p-3 outline-none focus:border-blue-500"
             />
-            <p className="text-xs text-gray-400 mt-1">Kirishda email o'rniga ishlatiladi</p>
+            <p className="text-xs text-gray-400 mt-1">Kirishda email o&apos;rniga ishlatiladi</p>
           </div>
           <button onClick={handleSave} disabled={saving} className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50">
             {saving ? 'Saqlanmoqda...' : success ? 'Saqlandi!' : 'Saqlash'}

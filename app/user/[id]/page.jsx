@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 
 export default function UserProfile() {
   const { id } = useParams()
@@ -46,9 +47,11 @@ export default function UserProfile() {
           <div className="bg-white rounded-xl shadow p-6 sticky top-6">
             <div className="mx-auto mb-4 w-20 h-20">
               {profile?.avatar_url ? (
-                <img
+                <Image
                   src={profile.avatar_url}
                   alt="avatar"
+                  width={80}
+                  height={80}
                   className="w-20 h-20 rounded-full object-cover"
                 />
               ) : (
