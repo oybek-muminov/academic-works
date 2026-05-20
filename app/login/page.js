@@ -137,7 +137,7 @@ export default function LoginPage() {
           {message && <p className="text-green-600 text-sm mb-4">{message}</p>}
           <input
             type="email"
-            placeholder="Email yoki username"
+            placeholder="Email"
             value={email}
             onChange={e => setEmail(e.target.value)}
             className="w-full border rounded-lg p-3 mb-3 outline-none focus:border-blue-500"
