@@ -4,6 +4,7 @@ import { getCurrentUser, supabase } from './lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
+import PeriodicTable from './components/PeriodicTable'
 
 export default function Home() {
   const router = useRouter()
@@ -105,6 +106,8 @@ export default function Home() {
       </header>
 
       <div className="max-w-4xl mx-auto p-6">
+        <PeriodicTable />
+
         <div className="flex gap-2 mb-6 flex-wrap">
           {categories.map((cat, i) => (
             <button key={i} onClick={() => setCategory(i)}
