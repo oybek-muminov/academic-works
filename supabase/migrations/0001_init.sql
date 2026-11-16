@@ -117,12 +117,21 @@ drop policy if exists profile_logins_own_delete on public.profile_logins;
 create policy profile_logins_own_delete on public.profile_logins
   for delete to authenticated using (user_id = auth.uid());
 
+-- Foydalanuvchi faqat o'z qatorini o'qiydi. Bu policy majburiy: PostgREST
+-- upsert (INSERT ... ON CONFLICT DO UPDATE) mavjud qatorni ko'rishi kerak,
+-- aks holda 42501 "new row violates row-level security policy" xatosi chiqadi.
+drop policy if exists profile_logins_own_read on public.profile_logins;
+create policy profile_logins_own_read on public.profile_logins
+  for select to authenticated using (user_id = auth.uid());
+
 grant select on public.profiles to anon, authenticated;
 grant insert, update on public.profiles to authenticated;
 grant select on public.works to anon, authenticated;
 grant insert, update, delete on public.works to authenticated;
 grant insert, update, delete on public.profile_logins to authenticated;
--- profile_logins uchun select ataylab berilmagan.
+grant select on public.profile_logins to authenticated;
+-- profile_logins: SELECT faqat o'z qatoriga (yuqoridagi policy), email
+-- ommaviy o'qilmaydi; username → email `email_for_username` RPC orqali.
 
 create or replace function public.email_for_username(uname text)
 returns text

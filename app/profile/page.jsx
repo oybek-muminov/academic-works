@@ -4,8 +4,15 @@ import { getCurrentUser, supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import { isValidOrcid, normalizeOrcid } from '../lib/orcid'
 
-export default function ProfilePage() {
-  const router = useRouter()
+// Saqlashda chiqadigan xatolarni tushunarli ko'rinishga keltiradi.
+const saveErrorText = (err) => {
+  if (err.code === '23505') return 'Bu username allaqachon band'
+  if (err.code === '42501') return "Ruxsat yo'q: Supabase RLS sozlamasi to'sib turibdi (migratsiyani tekshiring)"
+  if (err.code === 'PGRST204') return "Bazada kerakli ustun yo'q — migratsiyani ishga tushiring"
+  return `Profil saqlanmadi: ${err.message || err.code || "noma'lum xato"}`
+}
+
+export default function ProfilePage() {  const router = useRouter()
   const [user, setUser] = useState(null)
   const [fullName, setFullName] = useState('')
   const [university, setUniversity] = useState('')
@@ -65,17 +72,19 @@ export default function ProfilePage() {
         orcid: cleanOrcid || null,
       })
 
-    const { error: loginError } = profileError ? { error: profileError } : cleanUsername
-      ? await supabase.from('profile_logins').upsert(
-          { user_id: user.id, username: cleanUsername, email: user.email },
-          { onConflict: 'user_id' }
-        )
-      : await supabase.from('profile_logins').delete().eq('user_id', user.id)
+    const loginResult = profileError
+      ? { error: profileError }
+      : cleanUsername
+        ? await supabase.from('profile_logins').upsert(
+            { user_id: user.id, username: cleanUsername, email: user.email },
+            { onConflict: 'user_id' }
+          )
+        : await supabase.from('profile_logins').delete().eq('user_id', user.id)
 
     setSaving(false)
 
-    if (loginError) {
-      setError(loginError.code === '23505' ? 'Bu username allaqachon band' : "Profil saqlanmadi. Qayta urinib ko'ring.")
+    if (loginResult.error) {
+      setError(saveErrorText(loginResult.error))
       return
     }
 

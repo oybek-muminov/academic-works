@@ -37,6 +37,9 @@ yarn-error.log*
 # vercel
 .vercel
 
+# lokal sirlar (token, parol) — commit qilinmaydi
+.secrets/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
