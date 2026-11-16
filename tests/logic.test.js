@@ -2,7 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert/strict'
 import { elements } from '../app/data/elements.js'
 import { CATEGORIES, dedupeWorks, doiApiPath, doiUrl, isValidDoi, matchesWork, normalizeDoi, visibleCategory } from '../app/lib/works.js'
-import { findSiteMatch, isValidOrcid, matchesSiteWork, normalizeOrcid, normalizeTitle, orcidUrl } from '../app/lib/orcid.js'
+import { findSiteMatch, isValidOrcid, matchesSiteWork, normalizeOrcid, normalizeTitle, orcidUrl, categoryFromOrcidType, matchesOrcidWork, authorsFromWorkDetail } from '../app/lib/orcid.js'
 import { storagePath } from '../app/lib/filePath.js'
 
 test('elements: 118 ta va raqamlar takrorlanmaydi', () => {
@@ -44,6 +44,11 @@ test('matchesWork qidiruv va kategoriyani birlashtiradi', () => {
   assert.equal(matchesWork(work, { search: 'fizika' }), false)
   assert.equal(matchesWork(work, { category: 1 }), true)
   assert.equal(matchesWork(work, { category: 2 }), false)
+
+  const rich = { ...work, journal: 'Nuclear Materials', doi: '10.1016/j.nimb.2025.1', year: 2025 }
+  assert.equal(matchesWork(rich, { search: 'nuclear' }), true)
+  assert.equal(matchesWork(rich, { search: '10.1016' }), true)
+  assert.equal(matchesWork(rich, { search: '2025' }), true)
 })
 
 test('dedupeWorks faqat bir foydalanuvchining dublikatini yashiradi', () => {
@@ -138,4 +143,45 @@ test('matchesSiteWork DOI yoki sarlavha bo‘yicha mos keladi', () => {
   const site = [{ id: 'w1', doi: '10.1038/nature12373', title: 'X' }, { id: 'w2', doi: '', title: 'Boshqa' }]
   assert.equal(findSiteMatch(orcidWork, site)?.id, 'w1')
   assert.equal(findSiteMatch({ doi: '', title: 'Topilmadi' }, site), null)
+})
+
+test('categoryFromOrcidType ORCID turini sayt kategoriyasiga moslashtiradi', () => {
+  assert.equal(categoryFromOrcidType('journal-article'), 1)
+  assert.equal(categoryFromOrcidType('conference-paper'), 2)
+  assert.equal(categoryFromOrcidType('book-chapter'), 3)
+  assert.equal(categoryFromOrcidType('dissertation'), 6)
+  assert.equal(categoryFromOrcidType(null), 6)
+})
+
+test('matchesOrcidWork sarlavha, jurnal, DOI va yil bo‘yicha qidiradi', () => {
+  const work = {
+    title: 'SRIM simulation of irradiation damage by protons',
+    journal: 'Nuclear Materials',
+    doi: '10.1016/j.nimb.2025.1',
+    year: '2025',
+    type: 'journal-article',
+  }
+  assert.equal(matchesOrcidWork(work), true)
+  assert.equal(matchesOrcidWork(work, { search: 'srim' }), true)
+  assert.equal(matchesOrcidWork(work, { search: 'nuclear' }), true)
+  assert.equal(matchesOrcidWork(work, { search: '10.1016' }), true)
+  assert.equal(matchesOrcidWork(work, { search: '2025' }), true)
+  assert.equal(matchesOrcidWork(work, { search: 'fizika' }), false)
+})
+
+test('authorsFromWorkDetail mualliflarni takrorlanmasdan yig‘adi', () => {
+  const detail = {
+    contributors: {
+      contributor: [
+        { 'credit-name': { value: 'Ali Valiyev' } },
+        { 'credit-name': { value: 'Ali Valiyev' } },
+        { 'credit-name': { value: '   ' } },
+        { 'credit-name': null },
+        { 'credit-name': { value: 'Oybek Mominov' } },
+      ],
+    },
+  }
+  assert.equal(authorsFromWorkDetail(detail), 'Ali Valiyev, Oybek Mominov')
+  assert.equal(authorsFromWorkDetail({}), '')
+  assert.equal(authorsFromWorkDetail(null), '')
 })

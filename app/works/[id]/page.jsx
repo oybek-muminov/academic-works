@@ -78,7 +78,13 @@ export default function WorkDetail() {
           {work.journal && <p className="text-sm text-gray-600 mb-2">📖 {work.journal}</p>}
           {work.doi && <div className="mb-4"><DoiLink doi={work.doi} /></div>}
           <p className="text-xs text-gray-500 mb-4">{new Date(work.created_at).toLocaleDateString('uz')}</p>
-          <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block">Yuklab olish</a>
+          {work.file_url ? (
+            <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block">Yuklab olish</a>
+          ) : (
+            <p className="text-sm text-gray-500">
+              Fayl yuklanmagan{work.doi ? ' — to‘liq matn DOI havolasi orqali ochiladi.' : '.'}
+            </p>
+          )}
         </div>
         {profile && (
           <div className="bg-white rounded-xl shadow p-6">

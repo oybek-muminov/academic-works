@@ -138,7 +138,8 @@ export default function ProfilePage() {  const router = useRouter()
               className="w-full border rounded-lg p-3 outline-none focus:border-blue-500"
             />
             <p className="text-xs text-gray-500 mt-1">
-              Profilingizda ORCID&apos;dagi nashrlar ham ko&apos;rsatiladi
+              Raqamingiz boshqa foydalanuvchilarga ko&apos;rsatilmaydi. Nashrlaringiz dashboard&apos;dagi
+              «ORCID nashrlari» bo&apos;limida avtomatik ko&apos;rinadi.
             </p>
           </div>
           <div>

@@ -59,3 +59,39 @@ export const matchesSiteWork = (orcidWork, siteWork) => {
 
 export const findSiteMatch = (orcidWork, siteWorks = []) =>
   siteWorks.find(siteWork => matchesSiteWork(orcidWork, siteWork)) || null
+
+// ORCID ish turini saytdagi kategoriyaga moslashtiradi (1 — Maqola, 2 — Tezis,
+// 3 — Kitob, 6 — Boshqa).
+const CATEGORY_BY_ORCID_TYPE = {
+  'journal-article': 1,
+  'book-review': 1,
+  'conference-paper': 2,
+  'conference-abstract': 2,
+  'book': 3,
+  'book-chapter': 3,
+  'edited-book': 3,
+}
+
+export const categoryFromOrcidType = (type) =>
+  CATEGORY_BY_ORCID_TYPE[String(type || '').toLowerCase()] || 6
+
+// Dashboard'dagi qidiruv: sarlavha, jurnal, DOI va yil bo'yicha.
+export const matchesOrcidWork = (work, { search = '' } = {}) => {
+  const term = String(search || '').trim().toLowerCase()
+  if (!term) return true
+  return [work?.title, work?.journal, work?.doi, work?.year, work?.type]
+    .filter(value => value !== null && value !== undefined && String(value).trim() !== '')
+    .join(' ')
+    .toLowerCase()
+    .includes(term)
+}
+
+// ORCID ishining to'liq yozuvidan mualliflar ro'yxatini yig'adi.
+export const authorsFromWorkDetail = (detail) => {
+  const contributors = detail?.contributors?.contributor || []
+  const names = contributors
+    .map(contributor => contributor?.['credit-name']?.value)
+    .map(name => String(name || '').trim())
+    .filter(Boolean)
+  return [...new Set(names)].join(', ')
+}

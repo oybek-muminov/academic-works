@@ -5,9 +5,11 @@ export const visibleCategory = (id) => (id >= 1 && id < CATEGORIES.length ? CATE
 
 export const matchesWork = (work, { search = '', category = 0 } = {}) => {
   const term = search.trim().toLowerCase()
-  const inText = !term ||
-    (work.title || '').toLowerCase().includes(term) ||
-    (work.authors || '').toLowerCase().includes(term)
+  const haystack = [work.title, work.authors, work.journal, work.doi, work.year]
+    .filter(value => value !== null && value !== undefined && String(value).trim() !== '')
+    .join(' ')
+    .toLowerCase()
+  const inText = !term || haystack.includes(term)
   return inText && (category === 0 || work.category_id === category)
 }
 

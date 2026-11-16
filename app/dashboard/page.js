@@ -4,10 +4,12 @@ import { getCurrentUser, supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { CATEGORY_OPTIONS, matchesWork, visibleCategory, doiApiPath, isValidDoi, normalizeDoi } from '../lib/works'
+import { CATEGORIES, CATEGORY_OPTIONS, matchesWork, visibleCategory, doiApiPath, isValidDoi, normalizeDoi } from '../lib/works'
+import { categoryFromOrcidType, findSiteMatch, orcidUrl } from '../lib/orcid'
 import { useSignedUrls } from '../lib/files'
 import { storagePath } from '../lib/filePath'
 import DoiLink from '../components/DoiLink'
+import OrcidWorks from '../components/OrcidWorks'
 
 const MAX_FILE_MB = 20
 
@@ -25,6 +27,8 @@ export default function Dashboard() {
   const [uploading, setUploading] = useState(false)
   const [authors, setAuthors] = useState('')
   const [search, setSearch] = useState('')
+  const [category, setCategory] = useState(0)
+  const [tab, setTab] = useState('works')
   const [isPublic, setIsPublic] = useState(false)
   const [profile, setProfile] = useState(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
@@ -139,7 +143,38 @@ export default function Dashboard() {
     getUser()
   }, [fetchWorks, router])
 
-  const filtered = works.filter(w => matchesWork(w, { search }))
+  const filtered = works.filter(w => matchesWork(w, { search, category }))
+  const publicCount = works.filter(w => w.is_public).length
+  const hasOrcid = Boolean(profile?.orcid && orcidUrl(profile.orcid))
+
+  // ORCID nashrini saytga qo'shadi: fayl talab qilinmaydi, avval "Shaxsiy" holatda.
+  const handleOrcidImport = async (item) => {
+    if (!user) return { error: 'Avval tizimga kiring.' }
+    if (!item?.title) return { error: 'Sarlavha topilmadi.' }
+    if (findSiteMatch(item, works)) return { error: 'Bu ish allaqachon saytda bor.' }
+
+    const { data, error: insertError } = await supabase
+      .from('works')
+      .insert({
+        user_id: user.id,
+        title: item.title,
+        authors: item.authors || null,
+        category_id: categoryFromOrcidType(item.type),
+        is_public: false,
+        doi: normalizeDoi(item.doi) || null,
+        journal: item.journal || null,
+      })
+      .select('*')
+      .single()
+
+    if (insertError) {
+      console.error('ORCID import failed:', insertError)
+      return { error: "Ishni saqlab bo'lmadi. Qayta urinib ko'ring." }
+    }
+
+    if (data) setWorks(prev => [data, ...prev])
+    return { ok: true }
+  }
 
   const handleFileSelect = async (selectedFile) => {
     setFile(selectedFile)
@@ -290,24 +325,105 @@ export default function Dashboard() {
             >
               ✏️ Profilni tahrirlash
             </button>
+
+            {user && (
+              <Link
+                href={`/user/${user.id}`}
+                className="mt-2 block w-full text-center text-sm bg-white text-gray-600 border border-gray-200 py-2 rounded-lg hover:bg-gray-50 transition"
+              >
+                Ommaviy profilim ↗
+              </Link>
+            )}
+
+            {hasOrcid ? (
+              <a
+                href={orcidUrl(profile.orcid)}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="mt-2 block rounded-lg border border-green-200 bg-green-50 px-2 py-2 text-center text-xs text-green-700 transition hover:bg-green-100"
+              >
+                <span className="font-semibold">iD</span> ORCID ulangan
+                <span className="mt-0.5 block font-mono text-[10px] text-green-600">{profile.orcid}</span>
+              </a>
+            ) : (
+              <button
+                onClick={() => router.push('/profile')}
+                className="mt-2 w-full rounded-lg border border-dashed border-green-300 bg-green-50 px-2 py-2 text-xs text-green-700 transition hover:bg-green-100"
+              >
+                ➕ ORCID iD qo&apos;shish
+              </button>
+            )}
           </div>
         </div>
         
         {/* RIGHT COLUMN - Works */}
         <div className="flex-1 w-full">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-lg font-semibold">Mening ishlarim</h2>
-          <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">+ Yangi ish</button>
+        <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <h2 className="text-lg font-semibold">Mening ishlarim</h2>
+            <p className="text-xs text-gray-500">
+              {works.length} ta ish · {publicCount} ta ochiq
+            </p>
+          </div>
+          <button
+            onClick={() => { setTab('works'); setShowForm(!showForm) }}
+            className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+          >
+            + Yangi ish
+          </button>
         </div>
+
+        <div className="mb-4 flex flex-wrap gap-1 rounded-xl bg-gray-100 p-1" role="tablist" aria-label="Dashboard bo'limlari">
+          <button
+            role="tab"
+            aria-selected={tab === 'works'}
+            onClick={() => setTab('works')}
+            className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+              tab === 'works' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+            }`}
+          >
+            Saytdagi ishlar ({works.length})
+          </button>
+          {hasOrcid && (
+            <button
+              role="tab"
+              aria-selected={tab === 'orcid'}
+              onClick={() => setTab('orcid')}
+              className={`rounded-lg px-3 py-2 text-sm font-medium transition ${
+                tab === 'orcid' ? 'bg-white text-blue-700 shadow-sm' : 'text-gray-600 hover:text-gray-800'
+              }`}
+            >
+              ORCID nashrlari
+            </button>
+          )}
+        </div>
+
         {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl p-4 mb-4">{error}</div>}
+
+        {tab === 'works' ? (
+        <>
         <input
           type="text"
           aria-label="Ishlar ichida qidirish"
-          placeholder="Ishlar ichida qidirish..."
+          placeholder="Sarlavha, muallif, jurnal yoki DOI bo'yicha qidirish..."
           value={search}
           onChange={e => setSearch(e.target.value)}
-          className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:border-blue-500 bg-gray-50 mb-4"
+          className="w-full px-4 py-2 border border-gray-200 rounded-xl outline-none focus:border-blue-500 bg-gray-50 mb-3"
         />
+        <div className="mb-4 flex flex-wrap gap-2">
+          {CATEGORIES.map((cat, i) => (
+            <button
+              key={i}
+              onClick={() => setCategory(i)}
+              aria-pressed={category === i}
+              className={`px-3 py-1.5 rounded-full text-sm font-medium transition ${
+                category === i ? 'bg-blue-600 text-white' : 'bg-white text-gray-600 hover:bg-gray-100 shadow-sm'
+              }`}
+            >
+              {cat}
+            </button>
+          ))}
+        </div>
         {showForm && (
           <div className="bg-white rounded-xl shadow p-6 mb-6">
             <h3 className="font-semibold mb-4">Yangi ish yuklash</h3>
@@ -448,6 +564,14 @@ export default function Dashboard() {
         {!error && (works.length === 0 ? (
           <div className="bg-white rounded-xl shadow p-12 text-center text-gray-500">
             <p>Hali hech qanday ish yuklanmagan</p>
+            {hasOrcid && (
+              <button
+                onClick={() => setTab('orcid')}
+                className="mt-3 rounded-lg border border-blue-200 bg-blue-50 px-4 py-2 text-sm text-blue-700 transition hover:bg-blue-100"
+              >
+                ORCID&apos;dagi nashrlarni ko&apos;rish →
+              </button>
+            )}
           </div>
         ) : filtered.length === 0 ? (
           <div className="bg-white rounded-xl shadow p-12 text-center text-gray-500">
@@ -488,7 +612,11 @@ export default function Dashboard() {
                     </button>
                   </div>
                   <div className="flex flex-col gap-2 items-end">
-                    <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg text-sm hover:bg-blue-100 transition whitespace-nowrap">👁 Ko&apos;rish</a>
+                    {work.file_url ? (
+                      <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg text-sm hover:bg-blue-100 transition whitespace-nowrap">👁 Ko&apos;rish</a>
+                    ) : (
+                      <span className="border border-gray-200 px-3 py-1.5 text-xs text-gray-400 whitespace-nowrap">Fayl yuklanmagan</span>
+                    )}
                     <button onClick={() => handleDelete(work)} className="flex items-center gap-1 bg-red-50 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg text-sm hover:bg-red-100 transition whitespace-nowrap">🗑 O&apos;chirish</button>
                   </div>
                 </div>
@@ -496,6 +624,15 @@ export default function Dashboard() {
             ))}
           </div>
         ))}
+        </>
+        ) : (
+          <OrcidWorks
+            orcid={profile.orcid}
+            siteWorks={works}
+            onImport={handleOrcidImport}
+            onOpenWorks={() => setTab('works')}
+          />
+        )}
         </div>
       </div>
     </div>

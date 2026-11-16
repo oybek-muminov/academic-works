@@ -6,8 +6,6 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { CATEGORIES, matchesWork, visibleCategory } from '../../lib/works'
 import { useSignedUrls } from '../../lib/files'
-import { orcidUrl } from '../../lib/orcid'
-import OrcidWorks from '../../components/OrcidWorks'
 import DoiLink from '../../components/DoiLink'
 
 export default function UserProfile() {
@@ -70,16 +68,6 @@ export default function UserProfile() {
             <h2 className="font-bold text-center text-lg mb-1">{profile?.full_name || "Noma'lum"}</h2>
             {profile?.university && <p className="text-sm text-gray-500 text-center mb-1">🏛️ {profile.university}</p>}
             {profile?.faculty && <p className="text-sm text-gray-500 text-center mb-1">🎓 {profile.faculty}</p>}
-            {orcidUrl(profile?.orcid) && (
-              <a
-                href={orcidUrl(profile.orcid)}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="mt-3 flex items-center justify-center gap-1 rounded-lg border border-green-200 bg-green-50 px-2 py-1.5 text-xs text-green-700 transition hover:bg-green-100"
-              >
-                <span className="font-semibold">iD</span> ORCID profili ↗
-              </a>
-            )}
           </div>
         </div>
         <div className="flex-1 w-full">
@@ -87,7 +75,6 @@ export default function UserProfile() {
           {!profile && !error && (
             <div className="bg-white rounded-xl shadow p-6 mb-4 text-sm text-gray-500">Profil topilmadi</div>
           )}
-          {profile?.orcid && <OrcidWorks orcid={profile.orcid} siteWorks={works} />}
           <h3 className="mb-3 font-semibold text-gray-800">Saytdagi ishlar</h3>
           <input
             type="text"
@@ -132,10 +119,14 @@ export default function UserProfile() {
                         </div>
                       )}
                     </div>
-                    <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
-                      className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">
-                      Yuklab olish
-                    </a>
+                    {work.file_url ? (
+                      <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                        className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">
+                        Yuklab olish
+                      </a>
+                    ) : (
+                      <span className="border border-gray-200 px-3 py-2 text-xs text-gray-400 whitespace-nowrap">Fayl yo&apos;q</span>
+                    )}
                   </div>
                 </div>
               ))}

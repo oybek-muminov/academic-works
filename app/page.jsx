@@ -146,10 +146,14 @@ export default function Home() {
                     )}
                   </div>
                   <div className="flex flex-col gap-2 items-end flex-shrink-0">
-                    <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer"
-                      className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">
-                      Yuklab olish
-                    </a>
+                    {work.file_url ? (
+                      <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer"
+                        className="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">
+                        Yuklab olish
+                      </a>
+                    ) : (
+                      <span className="border border-gray-200 px-4 py-2 text-xs text-gray-400 whitespace-nowrap">Fayl yo&apos;q</span>
+                    )}
                     <button
                       onClick={() => fetchUploader(work.id, work.user_id)}
                       aria-expanded={expandedId === work.id}
