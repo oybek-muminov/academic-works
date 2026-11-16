@@ -32,3 +32,39 @@ export function useSignedUrls(urls) {
 
   return (url) => (url ? signed[url] || url : null)
 }
+
+// Faylni faqat foydalanuvchi bosganda imzolaydi — sahifa yuklanishida
+// barcha fayllar uchun ortiqcha storage so'rovi yuborilmaydi.
+const signedCache = new Map()
+const SIGNED_TTL_MS = 30 * 60 * 1000
+
+export const openWorkFile = async (fileUrl, fileName) => {
+  const path = storagePath(fileUrl)
+  if (!path) throw new Error('Fayl topilmadi.')
+
+  const cached = signedCache.get(path)
+  if (cached && cached.expiresAt > Date.now()) {
+    window.open(cached.url, '_blank', 'noopener,noreferrer')
+    return
+  }
+
+  // Imzolash asinxron bo'lgani uchun oynani darhol ochamiz (popup bloklanmasin).
+  const win = typeof window !== 'undefined' ? window.open('', '_blank') : null
+  if (win) win.opener = null
+
+  try {
+    const { data, error } = await supabase.storage
+      .from('works-files')
+      .createSignedUrl(path, 3600, fileName ? { download: fileName } : undefined)
+
+    if (error || !data?.signedUrl) throw new Error("Faylni ochib bo'lmadi.")
+
+    signedCache.set(path, { url: data.signedUrl, expiresAt: Date.now() + SIGNED_TTL_MS })
+
+    if (win) win.location.replace(data.signedUrl)
+    else window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+  } catch (err) {
+    if (win) win.close()
+    throw err
+  }
+}

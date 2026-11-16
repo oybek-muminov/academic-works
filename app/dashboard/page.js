@@ -1,12 +1,12 @@
 'use client'
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { getCurrentUser, supabase } from '../lib/supabase'
+import { getSessionUser, supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
-import { CATEGORIES, CATEGORY_OPTIONS, matchesWork, visibleCategory, doiApiPath, isValidDoi, normalizeDoi } from '../lib/works'
+import { CATEGORIES, CATEGORY_OPTIONS, matchesWork, visibleCategory, doiApiPath, isValidDoi, normalizeDoi, categoryFromCrossrefType } from '../lib/works'
 import { categoryFromOrcidType, findSiteMatch, orcidUrl } from '../lib/orcid'
-import { useSignedUrls } from '../lib/files'
+import { useSignedUrls, openWorkFile } from '../lib/files'
 import { storagePath } from '../lib/filePath'
 import DoiLink from '../components/DoiLink'
 import OrcidWorks from '../components/OrcidWorks'
@@ -40,13 +40,14 @@ export default function Dashboard() {
   const [doiError, setDoiError] = useState(false)
   const fileInputRef = useRef(null)
   const lastHydratedDoi = useRef('')
-  const resolveFileUrl = useSignedUrls([
-    profile?.avatar_url,
-    ...works.map(w => w.file_url),
-  ])
+  const resolveFileUrl = useSignedUrls([profile?.avatar_url])
 
   const fetchWorks = useCallback(async (userId) => {
-    const { data, error } = await supabase.from('works').select('*').eq('user_id', userId).order('created_at', { ascending: false })
+    const { data, error } = await supabase
+      .from('works')
+      .select('id,user_id,title,description,authors,category_id,is_public,file_url,file_name,doi,journal,created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
     if (error) {
       console.error('Works fetch failed:', error)
       setError("Ishlarni yuklab bo'lmadi. Qayta urinib ko'ring.")
@@ -56,9 +57,21 @@ export default function Dashboard() {
     setLoading(false)
   }, [])
 
-  const fetchProfile = async (userId) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
+  const fetchProfile = useCallback(async (userId) => {
+    const { data } = await supabase
+      .from('profiles')
+      .select('id,full_name,username,university,faculty,avatar_url,orcid')
+      .eq('id', userId)
+      .maybeSingle()
     setProfile(data)
+  }, [])
+
+  const handleOpenFile = async (work) => {
+    try {
+      await openWorkFile(work.file_url, work.file_name)
+    } catch (err) {
+      alert(err.message)
+    }
   }
 
   const handleAvatarUpload = async (file) => {
@@ -91,6 +104,14 @@ export default function Dashboard() {
     setUploadingAvatar(false)
   }
 
+  // Crossref'dan DOI bo'yicha ma'lumot oladi.
+  const fetchDoiData = async (value) => {
+    const response = await fetch(`/api/doi/${doiApiPath(value)}`)
+    const data = await response.json().catch(() => ({}))
+    if (!response.ok) throw new Error(data.error || "Crossref'da topilmadi.")
+    return data
+  }
+
   // DOI kiritilganda sarlavha, mualliflar va jurnalni Crossref'dan to'ldiradi.
   const fillFromDoi = async (rawDoi = doi, { force = false } = {}) => {
     const value = normalizeDoi(rawDoi)
@@ -109,14 +130,14 @@ export default function Dashboard() {
     setDoiError(false)
 
     try {
-      const response = await fetch(`/api/doi/${doiApiPath(value)}`)
-      const data = await response.json().catch(() => ({}))
-      if (!response.ok) throw new Error(data.error || "Crossref'da topilmadi.")
+      const data = await fetchDoiData(value)
 
       const filled = []
       if (data.title && !title.trim()) { setTitle(data.title); filled.push('sarlavha') }
       if (data.authors && !authors.trim()) { setAuthors(data.authors); filled.push('mualliflar') }
       if (data.journal) { setJournal(data.journal); filled.push('jurnal') }
+      const suggested = categoryFromCrossrefType(data.type)
+      if (categoryId === 1 && suggested) setCategoryId(suggested)
       setDoiYear(data.year || null)
       lastHydratedDoi.current = value
       setDoiMessage(
@@ -134,14 +155,13 @@ export default function Dashboard() {
 
   useEffect(() => {
     const getUser = async () => {
-      const user = await getCurrentUser()
-      if (!user) { router.push('/login'); return }
-      setUser(user)
-      fetchWorks(user.id)
-      fetchProfile(user.id)
+      const currentUser = await getSessionUser()
+      if (!currentUser) { router.push('/login'); return }
+      setUser(currentUser)
+      await Promise.all([fetchWorks(currentUser.id), fetchProfile(currentUser.id)])
     }
     getUser()
-  }, [fetchWorks, router])
+  }, [fetchWorks, fetchProfile, router])
 
   const filtered = works.filter(w => matchesWork(w, { search, category }))
   const publicCount = works.filter(w => w.is_public).length
@@ -202,36 +222,103 @@ export default function Dashboard() {
   }
 
   const handleUpload = async () => {
-    if (!title || !file) return alert('Sarlavha va fayl kerak!')
-    if (file.size > MAX_FILE_MB * 1024 * 1024) return alert(`Fayl hajmi ${MAX_FILE_MB} MB dan oshmasligi kerak!`)
+    if (uploading || !user) return
+
+    const cleanDoi = normalizeDoi(doi)
+    let finalTitle = title.trim()
+    let finalAuthors = authors.trim()
+    let finalJournal = journal.trim()
+    let finalCategory = categoryId
+
     setUploading(true)
-    const fileExt = file.name.split('.').pop() || 'bin'
-    const fileName = `${user.id}/${Date.now()}.${fileExt}`
-    const { error: uploadError } = await supabase.storage.from('works-files').upload(fileName, file)
-    if (uploadError) { alert('Fayl yuklanmadi!'); setUploading(false); return }
-    const { data: { publicUrl } } = supabase.storage.from('works-files').getPublicUrl(fileName)
-    const { error: insertError } = await supabase.from('works').insert({
-      user_id: user.id,
-      title,
-      description,
-      authors,
-      category_id: categoryId,
-      is_public: isPublic,
-      file_url: publicUrl,
-      file_name: file.name,
-      doi: normalizeDoi(doi) || null,
-      journal: journal || null,
-    })
-    if (insertError) {
-      await supabase.storage.from('works-files').remove([fileName])
-      alert('Ish bazaga saqlanmadi!')
+
+    try {
+      // DOI kiritilgan bo'lsa, bo'sh maydonlarni Crossref'dan avtomatik to'ldiramiz.
+      if (cleanDoi && (!finalTitle || !finalAuthors || !finalJournal)) {
+        if (!isValidDoi(cleanDoi)) {
+          setDoiError(true)
+          setDoiMessage("DOI noto'g'ri. Masalan: 10.1038/nature12373")
+          return
+        }
+
+        try {
+          const data = await fetchDoiData(cleanDoi)
+          finalTitle = finalTitle || (data.title || '').trim()
+          finalAuthors = finalAuthors || (data.authors || '').trim()
+          finalJournal = finalJournal || (data.journal || '').trim()
+          const suggested = categoryFromCrossrefType(data.type)
+          if (categoryId === 1 && suggested) finalCategory = suggested
+
+          setDoi(cleanDoi)
+          setTitle(finalTitle)
+          setAuthors(finalAuthors)
+          setJournal(finalJournal)
+          setCategoryId(finalCategory)
+          setDoiYear(data.year || null)
+          setDoiError(false)
+          setDoiMessage("Crossref'dan avtomatik to'ldirildi.")
+          lastHydratedDoi.current = cleanDoi
+        } catch (err) {
+          // Sarlavha qo'lda kiritilgan bo'lsa, DOI xatosiga qaramay davom etamiz.
+          if (!finalTitle) {
+            setDoiError(true)
+            setDoiMessage(err.message)
+            return
+          }
+        }
+      }
+
+      if (!finalTitle) {
+        alert('Sarlavha kerak yoki DOI kiriting!')
+        return
+      }
+
+      let fileUrl = null
+      let storedFileName = null
+
+      if (file) {
+        if (file.size > MAX_FILE_MB * 1024 * 1024) {
+          alert(`Fayl hajmi ${MAX_FILE_MB} MB dan oshmasligi kerak!`)
+          return
+        }
+        const fileExt = file.name.split('.').pop() || 'bin'
+        const storageName = `${user.id}/${Date.now()}.${fileExt}`
+        const { error: uploadError } = await supabase.storage.from('works-files').upload(storageName, file)
+        if (uploadError) {
+          alert('Fayl yuklanmadi!')
+          return
+        }
+        const { data: { publicUrl } } = supabase.storage.from('works-files').getPublicUrl(storageName)
+        fileUrl = publicUrl
+        storedFileName = file.name
+      }
+
+      const { error: insertError } = await supabase.from('works').insert({
+        user_id: user.id,
+        title: finalTitle,
+        description,
+        authors: finalAuthors || null,
+        category_id: finalCategory,
+        is_public: isPublic,
+        file_url: fileUrl,
+        file_name: storedFileName,
+        doi: cleanDoi || null,
+        journal: finalJournal || null,
+      })
+
+      if (insertError) {
+        const path = storagePath(fileUrl)
+        if (path) await supabase.storage.from('works-files').remove([path])
+        alert('Ish bazaga saqlanmadi!')
+        return
+      }
+
+      resetUploadForm()
+      setShowForm(false)
+      fetchWorks(user.id)
+    } finally {
       setUploading(false)
-      return
     }
-    resetUploadForm()
-    setShowForm(false)
-    fetchWorks(user.id)
-    setUploading(false)
   }
 
   const handleDelete = async (work) => {
@@ -427,7 +514,7 @@ export default function Dashboard() {
         {showForm && (
           <div className="bg-white rounded-xl shadow p-6 mb-6">
             <h3 className="font-semibold mb-4">Yangi ish yuklash</h3>
-            <p className="text-sm text-green-500 mb-3">Sarlavha va mualliflarni hujjatdan nusxa olib joylang. Bu saralash uchun zarur!</p>
+            <p className="text-sm text-green-500 mb-3">DOI raqamini kiriting va «Yuklash»ni bosing — sarlavha, mualliflar va jurnal o&apos;zi to&apos;ldiriladi. Fayl yuklash shart emas.</p>
             <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
               <label htmlFor="doiInput" className="mb-1 block text-xs font-medium text-blue-800">
                 DOI (ixtiyoriy)
@@ -452,7 +539,7 @@ export default function Dashboard() {
                 </button>
               </div>
               <p className="mt-1 text-[11px] text-blue-700">
-                DOI kiritilsa sarlavha, mualliflar va jurnal Crossref&apos;dan avtomatik to&apos;ldiriladi.
+                DOI kiritilsa sarlavha, mualliflar va jurnal avtomatik to&apos;ldiriladi. Fayl yuklash ixtiyoriy.
               </p>
               {doiMessage && (
                 <p className={`mt-1 text-xs ${doiError ? 'text-red-600' : 'text-green-700'}`}>{doiMessage}</p>
@@ -541,9 +628,9 @@ export default function Dashboard() {
                 </div>
               ) : (
                 <div className="text-gray-500">
-                  <p className="font-medium">Faylni shu yerga tashlang</p>
+                  <p className="font-medium">Fayl (ixtiyoriy) — shu yerga tashlang</p>
                   <p className="text-sm mt-1">yoki bosib tanlang</p>
-                  <p className="text-xs mt-2">PDF, DOC, DOCX, JPG, PNG</p>
+                  <p className="text-xs mt-2">DOI orqali qo&apos;shsangiz, fayl shart emas · PDF, DOC, DOCX, JPG, PNG</p>
                 </div>
               )}
             </div>
@@ -613,7 +700,7 @@ export default function Dashboard() {
                   </div>
                   <div className="flex flex-col gap-2 items-end">
                     {work.file_url ? (
-                      <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg text-sm hover:bg-blue-100 transition whitespace-nowrap">👁 Ko&apos;rish</a>
+                      <button type="button" onClick={() => handleOpenFile(work)} className="flex items-center gap-1 bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg text-sm hover:bg-blue-100 transition whitespace-nowrap">👁 Ko&apos;rish</button>
                     ) : (
                       <span className="border border-gray-200 px-3 py-1.5 text-xs text-gray-400 whitespace-nowrap">Fayl yuklanmagan</span>
                     )}

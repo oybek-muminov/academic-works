@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { elements } from '../app/data/elements.js'
-import { CATEGORIES, dedupeWorks, doiApiPath, doiUrl, isValidDoi, matchesWork, normalizeDoi, visibleCategory } from '../app/lib/works.js'
+import { CATEGORIES, categoryFromCrossrefType, dedupeWorks, doiApiPath, doiUrl, isValidDoi, matchesWork, normalizeDoi, visibleCategory } from '../app/lib/works.js'
 import { findSiteMatch, isValidOrcid, matchesSiteWork, normalizeOrcid, normalizeTitle, orcidUrl, categoryFromOrcidType, matchesOrcidWork, authorsFromWorkDetail } from '../app/lib/orcid.js'
 import { storagePath } from '../app/lib/filePath.js'
 
@@ -102,6 +102,15 @@ test('doiUrl va doiApiPath xavfsiz havola quradi', () => {
   assert.equal(doiUrl('not-a-doi'), null)
   assert.equal(doiApiPath('10.1000/a b#c'), '10.1000/ab%23c')
   assert.equal(doiApiPath('not-a-doi'), null)
+})
+
+test('categoryFromCrossrefType ish turini kategoriyaga moslashtiradi', () => {
+  assert.equal(categoryFromCrossrefType('journal-article'), 1)
+  assert.equal(categoryFromCrossrefType('proceedings-article'), 2)
+  assert.equal(categoryFromCrossrefType('book-chapter'), 3)
+  assert.equal(categoryFromCrossrefType('dissertation'), 6)
+  assert.equal(categoryFromCrossrefType('unknown-type'), 0)
+  assert.equal(categoryFromCrossrefType(null), 0)
 })
 
 test('normalizeOrcid turli ko‘rinishlarni birlashtiradi', () => {

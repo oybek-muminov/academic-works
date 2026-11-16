@@ -5,8 +5,11 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { visibleCategory } from '../../lib/works'
-import { useSignedUrls } from '../../lib/files'
+import { useSignedUrls, openWorkFile } from '../../lib/files'
 import DoiLink from '../../components/DoiLink'
+
+const WORK_COLUMNS = 'id,user_id,title,description,authors,category_id,journal,doi,file_url,file_name,is_public,created_at'
+const PROFILE_COLUMNS = 'id,full_name,university,faculty,year,avatar_url'
 
 export default function WorkDetail() {
   const { id } = useParams()
@@ -15,14 +18,18 @@ export default function WorkDetail() {
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const resolveFileUrl = useSignedUrls([work?.file_url, profile?.avatar_url])
+  const resolveFileUrl = useSignedUrls([profile?.avatar_url])
 
   useEffect(() => {
+    let active = true
+
     const fetchWork = async () => {
       const [{ data: work, error: workError }, currentUser] = await Promise.all([
-        supabase.from('works').select('*').eq('id', id).maybeSingle(),
+        supabase.from('works').select(WORK_COLUMNS).eq('id', id).maybeSingle(),
         getCurrentUser()
       ])
+
+      if (!active) return
 
       if (workError) {
         console.error('Work fetch failed:', workError)
@@ -41,12 +48,32 @@ export default function WorkDetail() {
       }
 
       setWork(work)
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', work.user_id).maybeSingle()
+
+      const { data: profile } = await supabase
+        .from('profiles')
+        .select(PROFILE_COLUMNS)
+        .eq('id', work.user_id)
+        .maybeSingle()
+
+      if (!active) return
       setProfile(profile)
       setLoading(false)
     }
+
     fetchWork()
+
+    return () => {
+      active = false
+    }
   }, [id, router])
+
+  const handleOpenFile = async () => {
+    try {
+      await openWorkFile(work?.file_url, work?.file_name)
+    } catch (err) {
+      alert(err.message)
+    }
+  }
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Yuklanmoqda...</div>
 
@@ -79,7 +106,7 @@ export default function WorkDetail() {
           {work.doi && <div className="mb-4"><DoiLink doi={work.doi} /></div>}
           <p className="text-xs text-gray-500 mb-4">{new Date(work.created_at).toLocaleDateString('uz')}</p>
           {work.file_url ? (
-            <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block">Yuklab olish</a>
+            <button type="button" onClick={handleOpenFile} className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block">Yuklab olish</button>
           ) : (
             <p className="text-sm text-gray-500">
               Fayl yuklanmagan{work.doi ? ' — to‘liq matn DOI havolasi orqali ochiladi.' : '.'}

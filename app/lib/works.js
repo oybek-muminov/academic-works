@@ -13,6 +13,24 @@ export const matchesWork = (work, { search = '', category = 0 } = {}) => {
   return inText && (category === 0 || work.category_id === category)
 }
 
+// Crossref ish turini sayt kategoriyasiga moslashtiradi; noma'lum tur uchun 0.
+const CATEGORY_BY_CROSSREF_TYPE = {
+  'journal-article': 1,
+  'posted-content': 1,
+  'proceedings-article': 2,
+  'book': 3,
+  'book-chapter': 3,
+  'edited-book': 3,
+  'monograph': 3,
+  'reference-book': 3,
+  'report': 6,
+  'dissertation': 6,
+  'dataset': 6,
+}
+
+export const categoryFromCrossrefType = (type) =>
+  CATEGORY_BY_CROSSREF_TYPE[String(type || '').toLowerCase()] || 0
+
 // DOI har xil ko'rinishda kiritilishi mumkin: to'liq havola, "doi:" prefiksi,
 // katta harflar yoki bo'sh joylar bilan. Hammasini bitta ko'rinishga keltiramiz.
 const DOI_PREFIX = /^(?:https?:\/\/(?:dx\.)?doi\.org\/|doi:\s*)/i

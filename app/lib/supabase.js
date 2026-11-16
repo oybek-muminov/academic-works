@@ -25,6 +25,15 @@ const clearStoredAuthTokens = async () => {
     .forEach(key => window.localStorage.removeItem(key))
 }
 
+export const getSessionUser = async () => {
+  try {
+    const { data } = await supabase.auth.getSession()
+    return data.session?.user || null
+  } catch {
+    return null
+  }
+}
+
 export const getCurrentUser = async () => {
   try {
     const { data, error } = await supabase.auth.getUser()

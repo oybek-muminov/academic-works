@@ -5,8 +5,11 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
 import { CATEGORIES, matchesWork, visibleCategory } from '../../lib/works'
-import { useSignedUrls } from '../../lib/files'
+import { useSignedUrls, openWorkFile } from '../../lib/files'
 import DoiLink from '../../components/DoiLink'
+
+const PROFILE_COLUMNS = 'id,full_name,university,faculty,avatar_url'
+const WORK_COLUMNS = 'id,user_id,title,authors,category_id,journal,doi,file_url,file_name,created_at'
 
 export default function UserProfile() {
   const { id } = useParams()
@@ -17,25 +20,53 @@ export default function UserProfile() {
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const resolveFileUrl = useSignedUrls([profile?.avatar_url, ...works.map(w => w.file_url)])
+  const resolveFileUrl = useSignedUrls([profile?.avatar_url])
 
   useEffect(() => {
+    let active = true
+
     const fetchData = async () => {
-      const { data: profile, error: profileError } = await supabase.from('profiles').select('*').eq('id', id).maybeSingle()
-      if (profileError) {
-        console.error('Profile fetch failed:', profileError)
+      const [profileResult, worksResult] = await Promise.all([
+        supabase.from('profiles').select(PROFILE_COLUMNS).eq('id', id).maybeSingle(),
+        supabase
+          .from('works')
+          .select(WORK_COLUMNS)
+          .eq('user_id', id)
+          .eq('is_public', true)
+          .order('created_at', { ascending: false }),
+      ])
+
+      if (!active) return
+
+      if (profileResult.error) {
+        console.error('Profile fetch failed:', profileResult.error)
         setError("Profilni yuklab bo'lmadi.")
         setLoading(false)
         return
       }
-      setProfile(profile)
-      const { data: works, error: worksError } = await supabase.from('works').select('*').eq('user_id', id).eq('is_public', true).order('created_at', { ascending: false })
-      if (worksError) console.error('Works fetch failed:', worksError)
-      setWorks(works || [])
+
+      if (worksResult.error) console.error('Works fetch failed:', worksResult.error)
+
+      setProfile(profileResult.data)
+      setWorks(worksResult.data || [])
       setLoading(false)
     }
+
     fetchData()
+
+    return () => {
+      active = false
+    }
   }, [id])
+
+  const handleOpenFile = async (event, work) => {
+    event.stopPropagation()
+    try {
+      await openWorkFile(work.file_url, work.file_name)
+    } catch (err) {
+      alert(err.message)
+    }
+  }
 
   const filtered = works.filter(w => matchesWork(w, { search, category }))
 
@@ -120,10 +151,10 @@ export default function UserProfile() {
                       )}
                     </div>
                     {work.file_url ? (
-                      <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()}
+                      <button type="button" onClick={e => handleOpenFile(e, work)}
                         className="bg-blue-600 text-white px-3 py-2 rounded-lg text-sm hover:bg-blue-700 whitespace-nowrap">
                         Yuklab olish
-                      </a>
+                      </button>
                     ) : (
                       <span className="border border-gray-200 px-3 py-2 text-xs text-gray-400 whitespace-nowrap">Fayl yo&apos;q</span>
                     )}
