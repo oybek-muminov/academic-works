@@ -4,12 +4,19 @@ import { getCurrentUser, supabase } from '../lib/supabase'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { CATEGORY_OPTIONS, matchesWork, visibleCategory, doiApiPath, isValidDoi, normalizeDoi } from '../lib/works'
+import { useSignedUrls } from '../lib/files'
+import { storagePath } from '../lib/filePath'
+import DoiLink from '../components/DoiLink'
+
+const MAX_FILE_MB = 20
 
 export default function Dashboard() {
   const router = useRouter()
   const [user, setUser] = useState(null)
   const [works, setWorks] = useState([])
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
   const [showForm, setShowForm] = useState(false)
   const [title, setTitle] = useState('')
   const [description, setDescription] = useState('')
@@ -21,21 +28,45 @@ export default function Dashboard() {
   const [isPublic, setIsPublic] = useState(false)
   const [profile, setProfile] = useState(null)
   const [uploadingAvatar, setUploadingAvatar] = useState(false)
+  const [doi, setDoi] = useState('')
+  const [journal, setJournal] = useState('')
+  const [doiYear, setDoiYear] = useState(null)
+  const [doiLoading, setDoiLoading] = useState(false)
+  const [doiMessage, setDoiMessage] = useState('')
+  const [doiError, setDoiError] = useState(false)
   const fileInputRef = useRef(null)
+  const lastHydratedDoi = useRef('')
+  const resolveFileUrl = useSignedUrls([
+    profile?.avatar_url,
+    ...works.map(w => w.file_url),
+  ])
 
   const fetchWorks = useCallback(async (userId) => {
-    const { data } = await supabase.from('works').select('*').eq('user_id', userId).order('created_at', { ascending: false })
-    setWorks(data || [])
+    const { data, error } = await supabase.from('works').select('*').eq('user_id', userId).order('created_at', { ascending: false })
+    if (error) {
+      console.error('Works fetch failed:', error)
+      setError("Ishlarni yuklab bo'lmadi. Qayta urinib ko'ring.")
+    } else {
+      setWorks(data || [])
+    }
     setLoading(false)
   }, [])
 
   const fetchProfile = async (userId) => {
-    const { data } = await supabase.from('profiles').select('*').eq('id', userId).single()
+    const { data } = await supabase.from('profiles').select('*').eq('id', userId).maybeSingle()
     setProfile(data)
   }
 
   const handleAvatarUpload = async (file) => {
     if (!file || !user) return
+    if (!file.type.startsWith('image/')) {
+      alert('Faqat rasm fayl yuklang!')
+      return
+    }
+    if (file.size > MAX_FILE_MB * 1024 * 1024) {
+      alert(`Rasm hajmi ${MAX_FILE_MB} MB dan oshmasligi kerak!`)
+      return
+    }
     setUploadingAvatar(true)
     const fileExt = file.name.split('.').pop()
     const fileName = `avatars/${user.id}.${fileExt}`
@@ -56,6 +87,47 @@ export default function Dashboard() {
     setUploadingAvatar(false)
   }
 
+  // DOI kiritilganda sarlavha, mualliflar va jurnalni Crossref'dan to'ldiradi.
+  const fillFromDoi = async (rawDoi = doi, { force = false } = {}) => {
+    const value = normalizeDoi(rawDoi)
+    if (!value) return
+    if (!isValidDoi(value)) {
+      setDoiError(true)
+      setDoiMessage("DOI noto'g'ri. Masalan: 10.1038/nature12373")
+      return
+    }
+    if (doiLoading) return
+    if (!force && lastHydratedDoi.current === value) return
+
+    setDoi(value)
+    setDoiLoading(true)
+    setDoiMessage('')
+    setDoiError(false)
+
+    try {
+      const response = await fetch(`/api/doi/${doiApiPath(value)}`)
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) throw new Error(data.error || "Crossref'da topilmadi.")
+
+      const filled = []
+      if (data.title && !title.trim()) { setTitle(data.title); filled.push('sarlavha') }
+      if (data.authors && !authors.trim()) { setAuthors(data.authors); filled.push('mualliflar') }
+      if (data.journal) { setJournal(data.journal); filled.push('jurnal') }
+      setDoiYear(data.year || null)
+      lastHydratedDoi.current = value
+      setDoiMessage(
+        filled.length
+          ? `Crossref'dan to'ldirildi: ${filled.join(', ')}.`
+          : "Ma'lumot olindi, lekin maydonlar allaqachon to'ldirilgan."
+      )
+    } catch (err) {
+      setDoiError(true)
+      setDoiMessage(err.message)
+    } finally {
+      setDoiLoading(false)
+    }
+  }
+
   useEffect(() => {
     const getUser = async () => {
       const user = await getCurrentUser()
@@ -67,11 +139,7 @@ export default function Dashboard() {
     getUser()
   }, [fetchWorks, router])
 
-  const filtered = works.filter(w =>
-    search === '' ||
-    (w.title && w.title.toLowerCase().includes(search.toLowerCase())) ||
-    (w.authors && w.authors.toLowerCase().includes(search.toLowerCase()))
-  )
+  const filtered = works.filter(w => matchesWork(w, { search }))
 
   const handleFileSelect = async (selectedFile) => {
     setFile(selectedFile)
@@ -84,6 +152,12 @@ export default function Dashboard() {
     setCategoryId(1)
     setFile(null)
     setIsPublic(false)
+    setDoi('')
+    setJournal('')
+    setDoiYear(null)
+    setDoiMessage('')
+    setDoiError(false)
+    lastHydratedDoi.current = ''
     if (fileInputRef.current) fileInputRef.current.value = ''
   }
 
@@ -94,14 +168,27 @@ export default function Dashboard() {
 
   const handleUpload = async () => {
     if (!title || !file) return alert('Sarlavha va fayl kerak!')
+    if (file.size > MAX_FILE_MB * 1024 * 1024) return alert(`Fayl hajmi ${MAX_FILE_MB} MB dan oshmasligi kerak!`)
     setUploading(true)
-    const fileExt = file.name.split('.').pop()
+    const fileExt = file.name.split('.').pop() || 'bin'
     const fileName = `${user.id}/${Date.now()}.${fileExt}`
     const { error: uploadError } = await supabase.storage.from('works-files').upload(fileName, file)
     if (uploadError) { alert('Fayl yuklanmadi!'); setUploading(false); return }
     const { data: { publicUrl } } = supabase.storage.from('works-files').getPublicUrl(fileName)
-    const { error: insertError } = await supabase.from('works').insert({ user_id: user.id, title, description, authors, category_id: categoryId, is_public: isPublic, file_url: publicUrl, file_name: file.name })
+    const { error: insertError } = await supabase.from('works').insert({
+      user_id: user.id,
+      title,
+      description,
+      authors,
+      category_id: categoryId,
+      is_public: isPublic,
+      file_url: publicUrl,
+      file_name: file.name,
+      doi: normalizeDoi(doi) || null,
+      journal: journal || null,
+    })
     if (insertError) {
+      await supabase.storage.from('works-files').remove([fileName])
       alert('Ish bazaga saqlanmadi!')
       setUploading(false)
       return
@@ -112,9 +199,15 @@ export default function Dashboard() {
     setUploading(false)
   }
 
-  const handleDelete = async (id) => {
+  const handleDelete = async (work) => {
     if (!confirm("O'chirishni tasdiqlaysizmi?")) return
-    await supabase.from('works').delete().eq('id', id)
+    const { error } = await supabase.from('works').delete().eq('id', work.id)
+    if (error) {
+      alert("O'chirib bo'lmadi!")
+      return
+    }
+    const path = storagePath(work.file_url)
+    if (path) await supabase.storage.from('works-files').remove([path])
     fetchWorks(user.id)
   }
 
@@ -141,9 +234,6 @@ export default function Dashboard() {
     router.push('/login')
   }
 
-  const categories = ['', 'Maqola', 'Tezis', 'Kitob', 'Sertifikat', 'Loyiha', 'Boshqa']
-  const visibleCategory = (categoryId) => categoryId === 6 ? '' : categories[categoryId]
-
   if (loading) return <div className="min-h-screen flex items-center justify-center">Yuklanmoqda...</div>
 
   return (
@@ -154,22 +244,23 @@ export default function Dashboard() {
           <button onClick={handleLogout} className="text-sm bg-red-50 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg hover:bg-red-100 transition">Chiqish</button>
         </div>
       </header>
-      <div className="max-w-6xl mx-auto p-6 flex gap-6 items-start">
+      <div className="max-w-6xl mx-auto p-6 flex flex-col lg:flex-row gap-6 items-start">
         {/* LEFT COLUMN - Profile */}
-        <div className="w-64 flex-shrink-0">
-          <div className="bg-white rounded-xl shadow p-6 sticky top-6">
+        <div className="w-full lg:w-64 flex-shrink-0">
+          <div className="bg-white rounded-xl shadow p-6 lg:sticky lg:top-6">
             
             {/* Avatar */}
             <div className="relative mx-auto w-20 h-20 mb-3">
               {profile?.avatar_url ? (
-                <Image src={profile.avatar_url} alt="avatar" width={80} height={80} className="w-20 h-20 rounded-full object-cover mx-auto" />
+                <Image src={resolveFileUrl(profile.avatar_url)} alt="Profil avatari" width={80} height={80} className="w-20 h-20 rounded-full object-cover mx-auto" />
               ) : (
                 <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-bold text-3xl mx-auto">
                   {profile?.full_name ? profile.full_name[0].toUpperCase() : user?.email?.[0].toUpperCase()}
                 </div>
               )}
-              <label className="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center cursor-pointer hover:bg-blue-700 text-sm">
-                📷
+              <label className="absolute bottom-0 right-0 bg-blue-600 text-white rounded-full w-7 h-7 flex items-center justify-center cursor-pointer hover:bg-blue-700 text-sm" title="Avatar yuklash">
+                <span aria-hidden="true">📷</span>
+                <span className="sr-only">Avatar yuklash</span>
                 <input type="file" accept="image/*" className="hidden" onChange={e => { if(e.target.files[0]) handleAvatarUpload(e.target.files[0]) }} />
               </label>
               {uploadingAvatar && (
@@ -183,7 +274,7 @@ export default function Dashboard() {
             </h2>
 
             {/* Email */}
-            <p className="text-xs text-gray-400 text-center mb-3 break-all">{user?.email}</p>
+            <p className="text-xs text-gray-500 text-center mb-3 break-all">{user?.email}</p>
 
             {/* University & Faculty */}
             {profile?.university && (
@@ -203,13 +294,15 @@ export default function Dashboard() {
         </div>
         
         {/* RIGHT COLUMN - Works */}
-        <div className="flex-1">
+        <div className="flex-1 w-full">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-lg font-semibold">Mening ishlarim</h2>
           <button onClick={() => setShowForm(!showForm)} className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700">+ Yangi ish</button>
         </div>
+        {error && <div className="bg-red-50 text-red-600 text-sm rounded-xl p-4 mb-4">{error}</div>}
         <input
           type="text"
+          aria-label="Ishlar ichida qidirish"
           placeholder="Ishlar ichida qidirish..."
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -219,17 +312,54 @@ export default function Dashboard() {
           <div className="bg-white rounded-xl shadow p-6 mb-6">
             <h3 className="font-semibold mb-4">Yangi ish yuklash</h3>
             <p className="text-sm text-green-500 mb-3">Sarlavha va mualliflarni hujjatdan nusxa olib joylang. Bu saralash uchun zarur!</p>
+            <div className="mb-3 rounded-lg border border-blue-200 bg-blue-50 p-3">
+              <label htmlFor="doiInput" className="mb-1 block text-xs font-medium text-blue-800">
+                DOI (ixtiyoriy)
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="doiInput"
+                  aria-label="DOI"
+                  placeholder="10.1038/nature12373"
+                  value={doi}
+                  onChange={e => { setDoi(e.target.value); setDoiMessage(''); setDoiError(false) }}
+                  onBlur={() => { if (doi.trim()) fillFromDoi() }}
+                  className="min-w-0 flex-1 rounded-lg border border-blue-200 bg-white p-2 text-sm outline-none focus:border-blue-500"
+                />
+                <button
+                  type="button"
+                  onClick={() => fillFromDoi(doi, { force: true })}
+                  disabled={doiLoading || !doi.trim()}
+                  className="whitespace-nowrap rounded-lg bg-blue-600 px-3 py-2 text-sm text-white transition hover:bg-blue-700 disabled:opacity-50"
+                >
+                  {doiLoading ? 'Yuklanmoqda...' : 'To\'ldirish'}
+                </button>
+              </div>
+              <p className="mt-1 text-[11px] text-blue-700">
+                DOI kiritilsa sarlavha, mualliflar va jurnal Crossref&apos;dan avtomatik to&apos;ldiriladi.
+              </p>
+              {doiMessage && (
+                <p className={`mt-1 text-xs ${doiError ? 'text-red-600' : 'text-green-700'}`}>{doiMessage}</p>
+              )}
+              {journal && !doiError && (
+                <p className="mt-1 text-xs text-blue-800">
+                  Jurnal: <span className="font-medium">{journal}</span>{doiYear ? ` (${doiYear})` : ''}
+                </p>
+              )}
+            </div>
             <div className="relative mb-3">
               <input
+                aria-label="Sarlavha"
                 placeholder="Sarlavha *"
                 value={title}
                 onChange={e => setTitle(e.target.value)}
                 className="w-full border rounded-lg p-3 outline-none focus:border-blue-500"
               />
             </div>
-            <textarea placeholder="Tavsif (ixtiyoriy)" value={description} onChange={e => setDescription(e.target.value)} className="w-full border rounded-lg p-3 mb-3 outline-none focus:border-blue-500 h-24 resize-none" />
+            <textarea aria-label="Tavsif" placeholder="Tavsif (ixtiyoriy)" value={description} onChange={e => setDescription(e.target.value)} className="w-full border rounded-lg p-3 mb-3 outline-none focus:border-blue-500 h-24 resize-none" />
             <div className="relative mb-3">
               <input
+                aria-label="Mualliflar"
                 placeholder="Mualliflar"
                 value={authors}
                 onChange={e => setAuthors(e.target.value)}
@@ -237,20 +367,23 @@ export default function Dashboard() {
               />
             </div>
             <select value={categoryId} onChange={e => setCategoryId(Number(e.target.value))} className="w-full border rounded-lg p-3 mb-3 outline-none focus:border-blue-500">
-              {categories.map((cat, i) => i > 0 && <option key={i} value={i}>{cat}</option>)}
+              {CATEGORY_OPTIONS.map((cat, i) => <option key={cat} value={i + 1}>{cat}</option>)}
             </select>
             <div className="flex items-center justify-between border rounded-lg p-3 mb-3">
               <div>
                 <p className="text-sm font-medium text-gray-700">
                   {isPublic ? 'Ochiq' : 'Shaxsiy'}
                 </p>
-                <p className="text-xs text-gray-400">
+                <p className="text-xs text-gray-500">
                   {isPublic ? 'Hamma ko\'ra oladi' : 'Faqat siz ko\'rasiz'}
                 </p>
               </div>
               <button
                 type="button"
                 onClick={() => setIsPublic(!isPublic)}
+                role="switch"
+                aria-checked={isPublic}
+                aria-label="Ishni ochiq qilish"
                 className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                   isPublic ? 'bg-blue-600' : 'bg-gray-300'
                 }`}
@@ -288,10 +421,10 @@ export default function Dashboard() {
                     x
                   </button>
                   <p className="font-medium">{file.name}</p>
-                  <p className="text-xs text-gray-400 mt-1">Boshqa fayl tanlash uchun bosing</p>
+                  <p className="text-xs text-gray-500 mt-1">Boshqa fayl tanlash uchun bosing</p>
                 </div>
               ) : (
-                <div className="text-gray-400">
+                <div className="text-gray-500">
                   <p className="font-medium">Faylni shu yerga tashlang</p>
                   <p className="text-sm mt-1">yoki bosib tanlang</p>
                   <p className="text-xs mt-2">PDF, DOC, DOCX, JPG, PNG</p>
@@ -312,26 +445,39 @@ export default function Dashboard() {
             </div>
           </div>
         )}
-        {works.length === 0 ? (
-          <div className="bg-white rounded-xl shadow p-12 text-center text-gray-400">
+        {!error && (works.length === 0 ? (
+          <div className="bg-white rounded-xl shadow p-12 text-center text-gray-500">
             <p>Hali hech qanday ish yuklanmagan</p>
+          </div>
+        ) : filtered.length === 0 ? (
+          <div className="bg-white rounded-xl shadow p-12 text-center text-gray-500">
+            <p>Hech narsa topilmadi</p>
           </div>
         ) : (
           <div className="space-y-3">
             {filtered.map(work => (
-              <div key={work.id} className="bg-white rounded-xl shadow px-5 flex justify-between items-center py-3">
+              <div key={work.id} className="bg-white rounded-xl shadow px-5 flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 py-3">
                 <div>
                   {visibleCategory(work.category_id) && <span className="bg-blue-100 text-blue-700 text-xs px-2 py-1 rounded-full mb-2 inline-block">{visibleCategory(work.category_id)}</span>}
                   <h3 className="font-semibold text-gray-900">{work.title}</h3>
                   {work.description && <p className="text-sm text-gray-700 border border-blue-200 mt-1 px-2 py-1"> {work.description}</p>}
                   {work.authors && <p className="text-xs text-gray-600 mt-2">{work.authors}</p>}
+                  {(work.journal || work.doi) && (
+                    <div className="mt-2 flex flex-wrap items-center gap-2">
+                      {work.journal && <span className="text-xs text-gray-500">{work.journal}</span>}
+                      {work.doi && <DoiLink doi={work.doi} />}
+                    </div>
+                  )}
                 </div>
-                <div className="flex gap-2 items-center">
+                <div className="flex gap-2 items-center justify-between sm:justify-end">
                   <div className="flex items-center gap-2">
                     <span className="text-xs text-gray-600">{work.is_public ? 'Ochiq' : 'Shaxsiy'}</span>
                     <button
                       type="button"
                       onClick={() => handleVisibilityToggle(work)}
+                      role="switch"
+                      aria-checked={work.is_public}
+                      aria-label={`${work.title} — ${work.is_public ? 'ochiq' : 'shaxsiy'}`}
                       className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
                         work.is_public ? 'bg-blue-600' : 'bg-gray-300'
                       }`}
@@ -342,14 +488,14 @@ export default function Dashboard() {
                     </button>
                   </div>
                   <div className="flex flex-col gap-2 items-end">
-                    <a href={work.file_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg text-sm hover:bg-blue-100 transition whitespace-nowrap">👁 Ko&apos;rish</a>
-                    <button onClick={() => handleDelete(work.id)} className="flex items-center gap-1 bg-red-50 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg text-sm hover:bg-red-100 transition whitespace-nowrap">🗑 O&apos;chirish</button>
+                    <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer" className="flex items-center gap-1 bg-blue-50 text-blue-600 border border-blue-200 px-3 py-1.5 rounded-lg text-sm hover:bg-blue-100 transition whitespace-nowrap">👁 Ko&apos;rish</a>
+                    <button onClick={() => handleDelete(work)} className="flex items-center gap-1 bg-red-50 text-red-500 border border-red-200 px-3 py-1.5 rounded-lg text-sm hover:bg-red-100 transition whitespace-nowrap">🗑 O&apos;chirish</button>
                   </div>
                 </div>
               </div>
             ))}
           </div>
-        )}
+        ))}
         </div>
       </div>
     </div>

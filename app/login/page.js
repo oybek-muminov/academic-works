@@ -26,13 +26,8 @@ export default function LoginPage() {
     if (!loginValue) return null
     if (loginValue.includes('@')) return loginValue
 
-    const { data: profile } = await supabase
-      .from('profiles')
-      .select('login_email')
-      .eq('username', loginValue.toLowerCase())
-      .single()
-
-    return profile?.login_email || null
+    const { data } = await supabase.rpc('email_for_username', { uname: loginValue.toLowerCase() })
+    return data || null
   }
 
   const handlePasswordReset = async () => {
@@ -65,43 +60,31 @@ export default function LoginPage() {
     }
 
     if (isRegister) {
-      const { error } = await supabase.auth.signUp({ email, password })
+      const { data, error } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: { emailRedirectTo: `${window.location.origin}/login` },
+      })
       if (error) {
         setError(error.message)
         setLoading(false)
         return
       }
 
-      alert('Muvaffaqiyatli ro\'yxatdan o\'tdingiz!')
+      if (!data.session) {
+        setMessage("Ro'yxatdan o'tdingiz. Emailingizga yuborilgan tasdiqlash havolasini bosib, keyin kiring.")
+        setIsRegister(false)
+        setLoading(false)
+        return
+      }
+
       router.push('/dashboard')
     } else {
-      let loginEmail = email.trim()
-
-      if (!loginEmail.includes('@')) {
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('id')
-          .eq('username', loginEmail.toLowerCase())
-          .single()
-
-        if (!profile) {
-          setError("Username topilmadi!")
-          setLoading(false)
-          return
-        }
-
-        const { data: profileWithEmail } = await supabase
-          .from('profiles')
-          .select('login_email')
-          .eq('username', loginEmail.toLowerCase())
-          .single()
-
-        if (!profileWithEmail?.login_email) {
-          setError("Bu username bilan email bog'lanmagan. Email bilan kiring.")
-          setLoading(false)
-          return
-        }
-        loginEmail = profileWithEmail.login_email
+      const loginEmail = await getEmailForLogin(email)
+      if (!loginEmail) {
+        setError('Email yoki username topilmadi!')
+        setLoading(false)
+        return
       }
 
       const { error } = await supabase.auth.signInWithPassword({ email: loginEmail, password })
@@ -136,25 +119,33 @@ export default function LoginPage() {
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
           {message && <p className="text-green-600 text-sm mb-4">{message}</p>}
           <input
-            type="email"
-            placeholder="Email"
+            type="text"
+            inputMode="email"
+            autoComplete="username"
+            aria-label="Email yoki username"
+            placeholder="Email yoki username"
             value={email}
             onChange={e => setEmail(e.target.value)}
+            onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
             className="w-full border rounded-lg p-3 mb-3 outline-none focus:border-blue-500"
           />
           {!isResetMode && (
             <div className="relative mb-4">
               <input
                 type={showPassword ? 'text' : 'password'}
+                autoComplete={isRegister ? 'new-password' : 'current-password'}
+                aria-label="Parol"
                 placeholder="Parol"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleSubmit() }}
                 className="w-full border rounded-lg p-3 outline-none focus:border-blue-500 pr-12"
               />
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute right-3 top-3 text-gray-400 hover:text-gray-600 text-lg"
+                aria-label={showPassword ? 'Parolni yashirish' : "Parolni ko'rsatish"}
+                className="absolute right-3 top-3 text-gray-500 hover:text-gray-600 text-lg"
               >
                 {showPassword ? '🙈' : '👁'}
               </button>

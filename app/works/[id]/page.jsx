@@ -4,6 +4,9 @@ import { getCurrentUser, supabase } from '../../lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import Image from 'next/image'
+import { visibleCategory } from '../../lib/works'
+import { useSignedUrls } from '../../lib/files'
+import DoiLink from '../../components/DoiLink'
 
 export default function WorkDetail() {
   const { id } = useParams()
@@ -11,26 +14,34 @@ export default function WorkDetail() {
   const [work, setWork] = useState(null)
   const [profile, setProfile] = useState(null)
   const [loading, setLoading] = useState(true)
-  const categories = ['', 'Maqola', 'Tezis', 'Kitob', 'Sertifikat', 'Loyiha', 'Boshqa']
-  const visibleCategory = (categoryId) => categoryId === 6 ? '' : categories[categoryId]
+  const [error, setError] = useState('')
+  const resolveFileUrl = useSignedUrls([work?.file_url, profile?.avatar_url])
 
   useEffect(() => {
     const fetchWork = async () => {
-      const [{ data: work }, currentUser] = await Promise.all([
-        supabase.from('works').select('*').eq('id', id).single(),
+      const [{ data: work, error: workError }, currentUser] = await Promise.all([
+        supabase.from('works').select('*').eq('id', id).maybeSingle(),
         getCurrentUser()
       ])
+
+      if (workError) {
+        console.error('Work fetch failed:', workError)
+        setError("Ishni yuklab bo'lmadi.")
+        setLoading(false)
+        return
+      }
 
       if (!work) { router.push('/'); return }
 
       const isOwner = currentUser?.id === work.user_id
       if (!work.is_public && !isOwner) {
-        router.push('/')
+        setError("Bu ish shaxsiy yoki mavjud emas.")
+        setLoading(false)
         return
       }
 
       setWork(work)
-      const { data: profile } = await supabase.from('profiles').select('*').eq('id', work.user_id).single()
+      const { data: profile } = await supabase.from('profiles').select('*').eq('id', work.user_id).maybeSingle()
       setProfile(profile)
       setLoading(false)
     }
@@ -38,6 +49,17 @@ export default function WorkDetail() {
   }, [id, router])
 
   if (loading) return <div className="min-h-screen flex items-center justify-center">Yuklanmoqda...</div>
+
+  if (!work) return (
+    <div className="min-h-screen bg-gray-50">
+      <header className="bg-white shadow-sm px-6 py-4 flex justify-between items-center">
+        <Link href="/" className="text-xl font-bold text-blue-600">Bosh sahifa</Link>
+      </header>
+      <div className="max-w-3xl mx-auto p-6">
+        <div className="bg-white rounded-xl shadow p-6 text-gray-600">{error || "Ish topilmadi."}</div>
+      </div>
+    </div>
+  )
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -53,8 +75,10 @@ export default function WorkDetail() {
           <h2 className="text-xl font-bold mt-3 mb-2">{work.title}</h2>
           {work.description && <p className="text-gray-600 mb-3">{work.description}</p>}
           {work.authors && <p className="text-sm text-gray-500 mb-4">{work.authors}</p>}
-          <p className="text-xs text-gray-400 mb-4">{new Date(work.created_at).toLocaleDateString('uz')}</p>
-          <a href={work.file_url} target="_blank" rel="noopener noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block">Yuklab olish</a>
+          {work.journal && <p className="text-sm text-gray-600 mb-2">📖 {work.journal}</p>}
+          {work.doi && <div className="mb-4"><DoiLink doi={work.doi} /></div>}
+          <p className="text-xs text-gray-500 mb-4">{new Date(work.created_at).toLocaleDateString('uz')}</p>
+          <a href={resolveFileUrl(work.file_url)} target="_blank" rel="noopener noreferrer" className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 inline-block">Yuklab olish</a>
         </div>
         {profile && (
           <div className="bg-white rounded-xl shadow p-6">
@@ -63,8 +87,8 @@ export default function WorkDetail() {
               <div className="w-12 h-12 flex-shrink-0">
                 {profile.avatar_url ? (
                   <Image
-                    src={profile.avatar_url}
-                    alt="avatar"
+                    src={resolveFileUrl(profile.avatar_url)}
+                    alt={`${profile.full_name || 'Foydalanuvchi'} avatari`}
                     width={48}
                     height={48}
                     className="w-12 h-12 rounded-full object-cover"
@@ -79,7 +103,7 @@ export default function WorkDetail() {
                 <p className="font-semibold">{profile.full_name || "Noma'lum"}</p>
                 {profile.university && <p className="text-sm text-gray-500">{profile.university}</p>}
                 {profile.faculty && <p className="text-sm text-gray-500">{profile.faculty}</p>}
-                {profile.year && <p className="text-sm text-gray-400">{profile.year}-kurs</p>}
+                {profile.year && <p className="text-sm text-gray-500">{profile.year}-kurs</p>}
               </div>
             </div>
             <Link href={`/user/${work.user_id}`} className="mt-4 inline-block text-sm text-blue-600 hover:underline">Barcha ishlarini ko&apos;rish</Link>

@@ -5,6 +5,10 @@ const supabaseHostname = process.env.NEXT_PUBLIC_SUPABASE_URL
   : undefined;
 
 const nextConfig: NextConfig = {
+  // Home papkadagi tasodifiy lockfile tufayli noto'g'ri root tanlanmasin.
+  turbopack: {
+    root: import.meta.dirname,
+  },
   images: {
     remotePatterns: supabaseHostname
       ? [

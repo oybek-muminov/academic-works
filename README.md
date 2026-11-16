@@ -1,36 +1,103 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Academic Works
 
-## Getting Started
+Ilmiy ishlar (maqola, tezis, kitob, sertifikat, loyiha) bazasi. Next.js 16 + Supabase (Auth, Postgres, Storage).
 
-First, run the development server:
+## Imkoniyatlar
+
+- Email yoki username bilan kirish, ro'yxatdan o'tish, parolni tiklash
+- Ish yuklash, tahrirlash (ochiq/shaxsiy), o'chirish
+- DOI kiritish: sarlavha, mualliflar va jurnal Crossref'dan avtomatik to'ladi
+- ORCID iD: profilda ORCID'dagi nashrlar ro'yxati, saytda borligi belgisi bilan
+- Bosh sahifa: qidiruv, kategoriya filtri, muallif profili
+- Profil: ism, universitet, fakultet, username, ORCID, avatar, parol
+- Kimyoviy elementlar davriy jadvali — alohida sahifa: `/davriy-jadval`
+
+## 1. O'rnatish
 
 ```bash
-npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
+npm install
+cp .env.example .env.local
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+`.env.local` ga Supabase loyihasining qiymatlarini yozing
+(Dashboard → Project Settings → API):
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```
+NEXT_PUBLIC_SUPABASE_URL=https://your-project-ref.supabase.co
+NEXT_PUBLIC_SUPABASE_ANON_KEY=your-anon-key
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## 2. Supabase sozlash
 
-## Learn More
+1. `supabase/migrations/0001_init.sql` faylini Supabase Dashboard → SQL Editor da ishga tushiring.
+   Skript jadvallar, RLS siyosatlari, `works-files` bucket va storage siyosatlarini yaratadi.
+2. `supabase/migrations/0002_doi_orcid.sql` faylini ham ishga tushiring — u
+   `works.doi`, `works.journal` va `profiles.orcid` ustunlarini qo'shadi.
+3. Authentication → Providers → Email ni yoqing.
+4. Authentication → URL Configuration:
+   - Site URL: saytingiz manzili (`http://localhost:3000` lokal uchun)
+   - Redirect URLs: `http://localhost:3000/**` va production domeningiz
+5. Parolni tiklash emaili ishlashi uchun Email shablonlarini tekshiring.
 
-To learn more about Next.js, take a look at the following resources:
+DOI va ORCID ma'lumotlari tashqi API'lardan server tomonda olinadi
+(`/api/doi/...` → Crossref, `/api/orcid/...` → pub.orcid.org), shuning uchun
+qo'shimcha kalit yoki CORS sozlash kerak emas.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Skript `works-files` bucketni **private** qiladi. Fayllar ilovada imzolangan
+(signed) havolalar orqali ochiladi. Mavjud fayllar o'chmaydi.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+## 3. Ishga tushirish
 
-## Deploy on Vercel
+```bash
+npm run dev     # http://localhost:3000
+```
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+## 4. Tekshiruvlar
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+```bash
+npm test        # sof logika testlari (node:test)
+npm run lint
+npm run typecheck
+npm run build
+```
+
+## Tuzilish
+
+```
+app/
+  page.jsx                 bosh sahifa (qidiruv, filtr)
+  davriy-jadval/           kimyoviy elementlar jadvali (alohida sahifa)
+  api/doi/[...doi]/        Crossref proxy (sarlavha, mualliflar, jurnal)
+  api/orcid/[orcid]/       ORCID nashrlari proxy
+  login/                   kirish, ro'yxatdan o'tish, parolni tiklash
+  reset-password/          yangi parol o'rnatish
+  dashboard/               shaxsiy kabinet, fayl yuklash, DOI avtoto'ldirish
+  profile/                 profil sozlamalari (ORCID bilan)
+  user/[id]/               foydalanuvchi profili (saytdagi + ORCID ishlari)
+  works/[id]/              ish tafsiloti
+  components/PeriodicTable davriy jadval
+  components/OrcidWorks    ORCID nashrlari ro'yxati
+  components/DoiLink       DOI havolasi
+  data/elements.js         118 element ma'lumoti
+  lib/supabase.js          Supabase klienti
+  lib/works.js             kategoriya, qidiruv, dedupe, DOI yordamchilari
+  lib/orcid.js             ORCID normalizatsiya va moslashtirish
+  lib/files.js             imzolangan URL hook
+  lib/filePath.js          storage yo'lini ajratish
+supabase/migrations/       DB sxemasi + RLS + storage siyosatlari
+tests/                     node:test testlari
+```
+
+## Xavfsizlik
+
+- RLS: `works` jadvalida faqat ochiq ishlar yoki o'z ishlari ko'rinadi.
+- `profile_logins` jadvali hech kimga to'g'ridan-to'g'ri o'qilmaydi; username →
+  email faqat `email_for_username` RPC orqali aniqlanadi.
+- Storage private; fayl ochish uchun imzolangan havola kerak.
+- Fayl hajmi klientda 20 MB bilan cheklangan. Production uchun bucket darajasida
+  qo'shimcha limit qo'yish tavsiya etiladi.
+
+## Eslatma
+
+`npm run build` `.env.local` (yoki CI env) bo'lmasa `supabaseUrl is required`
+xatosi bilan to'xtaydi — bu kutilgan holat.

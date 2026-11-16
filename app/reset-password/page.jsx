@@ -52,6 +52,8 @@ export default function ResetPassword() {
           {error && <p className="text-red-500 text-sm mb-4">{error}</p>}
           <input
             type="password"
+            autoComplete="new-password"
+            aria-label="Yangi parol"
             placeholder="Yangi parol (kamida 6 belgi)"
             value={password}
             onChange={e => setPassword(e.target.value)}
@@ -59,6 +61,8 @@ export default function ResetPassword() {
           />
           <input
             type="password"
+            autoComplete="new-password"
+            aria-label="Parolni tasdiqlang"
             placeholder="Parolni tasdiqlang"
             value={confirm}
             onChange={e => setConfirm(e.target.value)}
